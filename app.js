@@ -6,6 +6,17 @@
 
 let _currentUtterance = null;
 
+// Acceso seguro a localStorage (evita que el script se muera en modo incógnito/privado)
+function safeGetStorage(key) {
+  try { return localStorage.getItem(key) || ''; } catch (e) { return ''; }
+}
+function safeSetStorage(key, val) {
+  try { localStorage.setItem(key, val); } catch (e) {}
+}
+function safeRemoveStorage(key) {
+  try { localStorage.removeItem(key); } catch (e) {}
+}
+
 const state = {
   language: 'es-ES',
   isLiveCallActive: false,
@@ -14,7 +25,7 @@ const state = {
   recognition: null,
   lastAiSpeechText: '',
   conversationHistory: [],
-  geminiApiKey: localStorage.getItem('voicenote_gemini_key') || ''
+  geminiApiKey: safeGetStorage('voicenote_gemini_key')
 };
 
 // --- DOM References ---
@@ -293,13 +304,11 @@ async function fetchRealAiResponse(query) {
   const cleanQ = query.trim();
   const lower  = cleanQ.toLowerCase();
 
-  // Guardar en el historial para dar continuidad al chat
   state.conversationHistory.push({ role: 'user', content: cleanQ });
   if (state.conversationHistory.length > 14) {
     state.conversationHistory = state.conversationHistory.slice(-14);
   }
 
-  // Detectar si el usuario pide acción específica de PDF o Calendario
   const wantsPdf = lower.includes('pdf') || lower.includes('descargar documento') || lower.includes('descargar informe');
   const wantsCalendar = lower.includes('cita') || lower.includes('agenda') || lower.includes('calendario');
 
@@ -338,28 +347,12 @@ NO uses respuestas genéricas ni frases de relleno. Ve directo al contenido que 
     }
   }
 
-  // 2. INTENTO 2: Puter.js (IA Gratuita sin clave, nativa para navegadores)
-  if (window.puter && window.puter.ai) {
-    try {
-      const puterMsg = await window.puter.ai.chat(
-        `Eres VoiceNote AI. Responde en castellano, de forma útil, clara y completa a esta consulta:\n\n${cleanQ}`
-      );
-      const answer = typeof puterMsg === 'string' ? puterMsg : (puterMsg?.message?.content || puterMsg?.text);
-      if (answer && answer.trim().length > 5) {
-        state.conversationHistory.push({ role: 'assistant', content: answer.trim() });
-        return createAiResultObject(answer.trim(), wantsPdf, wantsCalendar);
-      }
-    } catch (err) {
-      console.warn('Puter AI fallback:', err);
-    }
-  }
-
-  // 3. INTENTO 3: Pollinations Direct GET (Limpio sin parámetros que bloqueen CORS)
+  // 2. INTENTO 2: Pollinations Direct (Sin registro, 100% libre)
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
+    const timer = setTimeout(() => controller.abort(), 9000);
 
-    const promptText = `Responde en castellano y en detalle como VoiceNote AI: ${cleanQ}`;
+    const promptText = `Eres VoiceNote AI de Hugo SP Studios. Responde en castellano de España, útil y directo: ${cleanQ}`;
     const getRes = await fetch(`https://text.pollinations.ai/${encodeURIComponent(promptText)}`, { signal: controller.signal });
     clearTimeout(timer);
 
@@ -371,14 +364,13 @@ NO uses respuestas genéricas ni frases de relleno. Ve directo al contenido que 
       }
     }
   } catch (err) {
-    console.warn('Pollinations GET fallback failed:', err.message);
+    console.warn('Pollinations fallback failed:', err.message);
   }
 
-  // 4. INTENTO 4: Motor Local Inteligente
+  // 3. INTENTO 3: Motor Local Inteligente
   return getSmartLocalAnswer(cleanQ, wantsPdf, wantsCalendar);
 }
 
-// Genera el objeto de respuesta limpio con versión hablada
 function createAiResultObject(fullText, wantsPdf = false, wantsCalendar = false) {
   const speechVersion = fullText
     .replace(/\$\$[\s\S]*?\$\$/g, '')
@@ -408,11 +400,10 @@ function createAiResultObject(fullText, wantsPdf = false, wantsCalendar = false)
   return result;
 }
 
-// Fallback local dinámico y útil cuando no hay conexión a internet
 function getSmartLocalAnswer(query, wantsPdf = false, wantsCalendar = false) {
   const q = query.toLowerCase().trim();
 
-  // 1. Cálculos matemáticos dinámicos
+  // Cálculos matemáticos dinámicos
   const mathMatch = q.match(/(\d+[\.,]?\d*)\s*(\+|\-|\*|\/|x|por|entre|mas|menos|dividido)\s*(\d+[\.,]?\d*)/i);
   if (mathMatch) {
     const n1 = parseFloat(mathMatch[1].replace(',', '.'));
@@ -427,7 +418,7 @@ function getSmartLocalAnswer(query, wantsPdf = false, wantsCalendar = false) {
     return createAiResultObject(`El resultado de su cálculo es:\n\n$$${n1} ${op} ${n2} = ${r}$$`, wantsPdf, wantsCalendar);
   }
 
-  // 2. Saludos (SOLO si el mensaje es únicamente un saludo, no una consulta completa)
+  // Saludos cortos aislados
   const isOnlyGreeting = /^(hola|buenas|buenos días|buenas tardes|buenas noches|qué tal|que tal|hey|ey)\b[\s!.?]*$/i.test(q);
   if (isOnlyGreeting) {
     const greetings = [
@@ -439,12 +430,10 @@ function getSmartLocalAnswer(query, wantsPdf = false, wantsCalendar = false) {
     return createAiResultObject(picked, wantsPdf, wantsCalendar);
   }
 
-  // 3. Quién te creó
   if (q.includes('quién eres') || q.includes('quien eres') || q.includes('quién te creó') || q.includes('quien te creo')) {
     return createAiResultObject('Soy **VoiceNote AI**, tu asistente inteligente con voz en castellano, desarrollado por **Hugo SP Studios**.', wantsPdf, wantsCalendar);
   }
 
-  // 4. Hora o fecha actual
   if (q.includes('hora') || q.includes('fecha') || q.includes('qué día es') || q.includes('que dia es')) {
     const now = new Date();
     const hora = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
@@ -452,7 +441,6 @@ function getSmartLocalAnswer(query, wantsPdf = false, wantsCalendar = false) {
     return createAiResultObject(`Hoy es **${fecha}** y son las **${hora}**.`, wantsPdf, wantsCalendar);
   }
 
-  // 5. Mensaje si no hay conexión a internet o la API pública está saturada
   return {
     text: `⚠️ **Aviso de Conexión:**\n\nNo he podido conectar con el servidor de inteligencia artificial en este momento.\n\n💡 **Solución recomendada:**\nPuedes pulsar en el botón de **Configuración ⚙️** (arriba a la derecha) e ingresar tu propia clave gratuita de **Google Gemini** para obtener respuestas inmediatas y garantizadas.`,
     speechText: 'No he podido conectar con el servidor de inteligencia artificial. Revisa tu conexión a internet o pulsa en configuración para añadir tu clave gratuita de Gemini.'
@@ -568,7 +556,6 @@ function replaceThinkingBubble(id, aiOutput) {
   refreshIcons();
   renderMathFormulas(div.querySelector('.math-content'));
 
-  // Eventos de botones
   div.querySelector('[data-speak-msg]')?.addEventListener('click', (e) => {
     speakSpanishVoice(decodeURIComponent(e.currentTarget.dataset.speakMsg));
   });
@@ -593,7 +580,6 @@ function replaceThinkingBubble(id, aiOutput) {
   elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
 }
 
-// --- PDF Generator ---
 function generatePdfDocument(title, text) {
   try {
     const { jsPDF } = window.jspdf || {};
@@ -616,7 +602,6 @@ function generatePdfDocument(title, text) {
   } catch (err) { console.error(err); }
 }
 
-// --- Apple Calendar (.ICS) Generator ---
 function downloadIcsCalendarFile(title) {
   const now   = new Date();
   const start = new Date(now.getTime() + 86400000).toISOString().replace(/[-:]|\.\d{3}/g, '');
@@ -652,24 +637,51 @@ function escapeHtml(text) {
 // EVENT LISTENERS
 // =====================================================
 
-elements.chatForm.addEventListener('submit', (e) => {
-  e.preventDefault();
-  const text = elements.chatInput.value.trim();
-  if (text) handleUserSubmit(text, false);
-});
+// Enviar mensaje escrito (por formulario)
+if (elements.chatForm) {
+  elements.chatForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const text = elements.chatInput.value.trim();
+    if (text) handleUserSubmit(text, false);
+  });
+}
 
-elements.micBtn.addEventListener('click', () => {
-  if (state.isRecording) {
-    stopSpeechRecognizer();
-  } else {
-    elements.micBtn.classList.remove('bg-slate-800','text-slate-300');
-    elements.micBtn.classList.add('bg-red-500','text-white','animate-pulse');
-    elements.micIcon.setAttribute('data-lucide','square');
-    refreshIcons();
-    startSpeechRecognizer();
-  }
-});
+// Enviar mensaje haciendo clic en el botón de la flecha
+if (elements.sendBtn) {
+  elements.sendBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    const text = elements.chatInput.value.trim();
+    if (text) handleUserSubmit(text, false);
+  });
+}
 
+// Enviar pulsando tecla Enter en el campo de texto
+if (elements.chatInput) {
+  elements.chatInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const text = elements.chatInput.value.trim();
+      if (text) handleUserSubmit(text, false);
+    }
+  });
+}
+
+// Micrófono de dictado (texto)
+if (elements.micBtn) {
+  elements.micBtn.addEventListener('click', () => {
+    if (state.isRecording) {
+      stopSpeechRecognizer();
+    } else {
+      elements.micBtn.classList.remove('bg-slate-800','text-slate-300');
+      elements.micBtn.classList.add('bg-red-500','text-white','animate-pulse');
+      elements.micIcon.setAttribute('data-lucide','square');
+      refreshIcons();
+      startSpeechRecognizer();
+    }
+  });
+}
+
+// Botón MODO VOZ
 if (elements.openLiveVoiceBtn) {
   elements.openLiveVoiceBtn.addEventListener('touchend', (e) => {
     e.preventDefault();
@@ -680,33 +692,40 @@ if (elements.openLiveVoiceBtn) {
   });
 }
 
+// Cerrar modal de voz
 if (elements.closeLiveVoiceBtn) {
   elements.closeLiveVoiceBtn.addEventListener('touchend', (e) => { e.preventDefault(); closeLiveVoiceModal(e); });
   elements.closeLiveVoiceBtn.addEventListener('click',    (e) => { if (e.pointerType !== 'touch') closeLiveVoiceModal(e); });
 }
 
+// Botón repetir última respuesta en voz
 if (elements.manualSpeakBtn) {
   elements.manualSpeakBtn.addEventListener('click', () => {
     if (state.lastAiSpeechText) speakSpanishVoice(state.lastAiSpeechText);
   });
 }
 
-elements.toggleVoiceCallMicBtn.addEventListener('click', () => {
-  if (state.isRecording) {
-    stopSpeechRecognizer();
-    elements.callMicIcon.setAttribute('data-lucide','mic-off');
-  } else {
-    startSpeechRecognizer();
-    elements.callMicIcon.setAttribute('data-lucide','mic');
-  }
-  refreshIcons();
-});
+// Micrófono dentro del modal de voz
+if (elements.toggleVoiceCallMicBtn) {
+  elements.toggleVoiceCallMicBtn.addEventListener('click', () => {
+    if (state.isRecording) {
+      stopSpeechRecognizer();
+      elements.callMicIcon.setAttribute('data-lucide','mic-off');
+    } else {
+      startSpeechRecognizer();
+      elements.callMicIcon.setAttribute('data-lucide','mic');
+    }
+    refreshIcons();
+  });
+}
 
 // Nueva conversación
-elements.clearChatBtn.addEventListener('click', () => {
-  state.conversationHistory = [];
-  location.reload();
-});
+if (elements.clearChatBtn) {
+  elements.clearChatBtn.addEventListener('click', () => {
+    state.conversationHistory = [];
+    location.reload();
+  });
+}
 
 // Modal de Configuración (Gemini API Key)
 if (elements.settingsBtn && elements.settingsModal) {
@@ -728,11 +747,11 @@ if (elements.settingsBtn && elements.settingsModal) {
     const key = elements.geminiApiKeyInput.value.trim();
     state.geminiApiKey = key;
     if (key) {
-      localStorage.setItem('voicenote_gemini_key', key);
+      safeSetStorage('voicenote_gemini_key', key);
       elements.apiKeyStatus.textContent = '✓ Guardado correctamente';
       elements.apiKeyStatus.className = 'text-emerald-400 text-[10px]';
     } else {
-      localStorage.removeItem('voicenote_gemini_key');
+      safeRemoveStorage('voicenote_gemini_key');
       elements.apiKeyStatus.textContent = 'Modo libre activado';
       elements.apiKeyStatus.className = 'text-sky-400 text-[10px]';
     }
