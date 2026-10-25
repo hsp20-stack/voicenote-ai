@@ -4,7 +4,6 @@
  * Fix iOS Safari: la voz se activa SINCRÓNICAMENTE en el gesto del usuario
  */
 
-// Utterance global para evitar que el Garbage Collector de iOS lo cancele
 let _currentUtterance = null;
 
 const state = {
@@ -67,23 +66,18 @@ function renderMathFormulas(element) {
 
 // =====================================================
 // MOTOR DE VOZ — Fix iOS Safari
-// Regla de oro: speak() debe llamarse en el mismo tick
-// que el gesto del usuario (click/touchend)
 // =====================================================
 
-// 1. Carga de voces (se dispara en cuanto el navegador las tiene)
 function initVoices() {
   if (!('speechSynthesis' in window)) return;
-  window.speechSynthesis.getVoices(); // trigger load
+  window.speechSynthesis.getVoices();
   window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
 }
 
-// 2. Selecciona la mejor voz en español disponible
 function getBestSpanishVoice() {
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) return null;
 
-  // Preferencia: voces de España con nombre conocido
   const preferred = voices.find(v =>
     v.lang.toLowerCase().startsWith('es') &&
     (v.name.includes('Monica')  || v.name.includes('Mónica')  ||
@@ -91,40 +85,17 @@ function getBestSpanishVoice() {
      v.name.includes('España')  || v.name.includes('Siri')    ||
      v.name.includes('Google español') || v.name.includes('es-ES'))
   );
-  // Fallback: cualquier voz en español
   return preferred || voices.find(v => v.lang.toLowerCase().startsWith('es')) || null;
 }
 
-// Voz masculina en español — usada SOLO en el Orbe (botón al lado de Enviar)
-function getMaleSpanishVoice() {
-  const voices = window.speechSynthesis.getVoices();
-  if (!voices.length) return null;
-
-  const maleNames = ['Jorge', 'Diego', 'Carlos', 'Pablo', 'Miguel', 'Juan',
-                     'Javier', 'Antonio', 'Enrique', 'Rodrigo', 'Luciano'];
-
-  // Buscar voz masculina por nombre
-  const maleVoice = voices.find(v =>
-    v.lang.toLowerCase().startsWith('es') &&
-    maleNames.some(name => v.name.includes(name))
-  );
-
-  // Fallback: cualquier voz en español
-  return maleVoice || voices.find(v => v.lang.toLowerCase().startsWith('es')) || null;
-}
-
-// 3. Función principal de habla — SIEMPRE llamar en gesto directo del usuario
-// useMaleVoice = true → voz masculina (Orbe); false → voz por defecto (chat)
-function speakSpanishVoice(text, onEndCallback = null, useMaleVoice = false) {
+function speakSpanishVoice(text, onEndCallback = null) {
   if (!('speechSynthesis' in window) || !text) {
     if (onEndCallback) onEndCallback();
     return;
   }
 
-  // Detener síntesis previa
   window.speechSynthesis.cancel();
 
-  // Limpiar texto de LaTeX y markdown para pronunciación natural
   const clean = text
     .replace(/\$\$[\s\S]*?\$\$/g, '')
     .replace(/\$[^$]*?\$/g, '')
@@ -142,7 +113,6 @@ function speakSpanishVoice(text, onEndCallback = null, useMaleVoice = false) {
 
   if (!clean) { if (onEndCallback) onEndCallback(); return; }
 
-  // Crear utterance y guardarlo globalmente (evita GC en iOS)
   _currentUtterance = new SpeechSynthesisUtterance(clean);
   _currentUtterance.lang  = 'es-ES';
   _currentUtterance.rate  = 0.95;
@@ -155,7 +125,6 @@ function speakSpanishVoice(text, onEndCallback = null, useMaleVoice = false) {
   state.isAiSpeaking = true;
   state.lastAiSpeechText = text;
 
-  // Actualizar UI del orbe
   if (state.isLiveCallActive) {
     elements.voiceStatusText.textContent = '🔊 Hablándote en castellano...';
     elements.voiceOrb.className = 'w-48 h-48 sm:w-56 sm:h-56 rounded-full bg-gradient-to-tr from-cyan-400 via-sky-500 to-blue-600 animate-orb-glow flex items-center justify-center relative cursor-pointer shadow-2xl transition-all scale-110';
@@ -183,10 +152,8 @@ function speakSpanishVoice(text, onEndCallback = null, useMaleVoice = false) {
     if (onEndCallback) onEndCallback();
   };
 
-  // Speak — debe estar en el mismo stack call del gesto del usuario
   window.speechSynthesis.speak(_currentUtterance);
 
-  // Workaround Chrome/Android: keepalive cada 10s para evitar que se corte
   const keepAlive = setInterval(() => {
     if (!state.isAiSpeaking) { clearInterval(keepAlive); return; }
     window.speechSynthesis.pause();
@@ -270,19 +237,15 @@ function stopSpeechRecognizer() {
 }
 
 // =====================================================
-// MODAL DE VOZ — Fix iOS: speak() en el mismo gesto
+// MODAL DE VOZ
 // =====================================================
 function openLiveVoiceModal(e) {
   if (e) { e.preventDefault(); e.stopPropagation(); }
-
-  // Evitar doble apertura
   if (state.isLiveCallActive) return;
   state.isLiveCallActive = true;
 
-  // Detener reconocimiento si estaba activo
   stopSpeechRecognizer();
 
-  // Mostrar modal
   elements.liveVoiceModal.classList.remove('hidden');
   elements.liveVoiceModal.style.display = 'flex';
 
@@ -290,7 +253,6 @@ function openLiveVoiceModal(e) {
   elements.voiceStatusText.textContent = '🔊 Hablándote en castellano...';
   elements.voiceTranscriptPreview.textContent = `"${greeting}"`;
 
-  // ✅ CLAVE iOS: speak() se llama AQUÍ, en el mismo handler del toque del usuario
   speakSpanishVoice(greeting, () => {
     if (state.isLiveCallActive) {
       elements.voiceStatusText.textContent = '🎤 Te escucho... habla ahora';
@@ -346,7 +308,7 @@ Responde SIEMPRE en castellano de España, con tono claro, conciso, natural y di
 Si la consulta incluye fórmulas o matemáticas, utiliza notación LaTeX (en bloque con $$...$$ o en línea con $...$).
 NO uses respuestas genéricas ni frases de relleno. Ve directo al contenido que pide el usuario.`;
 
-  // 1. INTENTO 1: Google Gemini API (si el usuario la ha configurado)
+  // 1. INTENTO 1: Google Gemini API (si el usuario la ha configurado en ⚙️)
   if (state.geminiApiKey) {
     try {
       const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(state.geminiApiKey.trim())}`, {
@@ -376,49 +338,34 @@ NO uses respuestas genéricas ni frases de relleno. Ve directo al contenido que 
     }
   }
 
-  // 2. INTENTO 2: Pollinations POST (Multi-conversación en vivo sin semilla fija)
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 7000);
-
-    const postRes = await fetch('https://text.pollinations.ai/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...state.conversationHistory.slice(-8)
-        ],
-        model: 'openai'
-      }),
-      signal: controller.signal
-    });
-
-    clearTimeout(timer);
-
-    if (postRes.ok) {
-      const answer = await postRes.text();
-      if (answer && answer.trim().length > 2 && !answer.includes('Rate limit')) {
+  // 2. INTENTO 2: Puter.js (IA Gratuita sin clave, nativa para navegadores)
+  if (window.puter && window.puter.ai) {
+    try {
+      const puterMsg = await window.puter.ai.chat(
+        `Eres VoiceNote AI. Responde en castellano, de forma útil, clara y completa a esta consulta:\n\n${cleanQ}`
+      );
+      const answer = typeof puterMsg === 'string' ? puterMsg : (puterMsg?.message?.content || puterMsg?.text);
+      if (answer && answer.trim().length > 5) {
         state.conversationHistory.push({ role: 'assistant', content: answer.trim() });
         return createAiResultObject(answer.trim(), wantsPdf, wantsCalendar);
       }
+    } catch (err) {
+      console.warn('Puter AI fallback:', err);
     }
-  } catch (err) {
-    console.warn('Pollinations POST failed, trying GET fallback:', err.message);
   }
 
-  // 3. INTENTO 3: Pollinations GET (Compatible 100% con CORS en navegadores y móviles)
+  // 3. INTENTO 3: Pollinations Direct GET (Limpio sin parámetros que bloqueen CORS)
   try {
-    const controller2 = new AbortController();
-    const timer2 = setTimeout(() => controller2.abort(), 7000);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
 
-    const getUrl = `https://text.pollinations.ai/${encodeURIComponent(cleanQ)}?system=${encodeURIComponent(systemPrompt)}&model=mistral`;
-    const getRes = await fetch(getUrl, { signal: controller2.signal });
-    clearTimeout(timer2);
+    const promptText = `Responde en castellano y en detalle como VoiceNote AI: ${cleanQ}`;
+    const getRes = await fetch(`https://text.pollinations.ai/${encodeURIComponent(promptText)}`, { signal: controller.signal });
+    clearTimeout(timer);
 
     if (getRes.ok) {
       const answer = await getRes.text();
-      if (answer && answer.trim().length > 2 && !answer.includes('Rate limit')) {
+      if (answer && answer.trim().length > 5 && !answer.includes('Rate limit')) {
         state.conversationHistory.push({ role: 'assistant', content: answer.trim() });
         return createAiResultObject(answer.trim(), wantsPdf, wantsCalendar);
       }
@@ -427,7 +374,7 @@ NO uses respuestas genéricas ni frases de relleno. Ve directo al contenido que 
     console.warn('Pollinations GET fallback failed:', err.message);
   }
 
-  // 4. INTENTO 4: Motor Local Inteligente (Nunca repite plantillas estáticas)
+  // 4. INTENTO 4: Motor Local Inteligente
   return getSmartLocalAnswer(cleanQ, wantsPdf, wantsCalendar);
 }
 
@@ -465,7 +412,7 @@ function createAiResultObject(fullText, wantsPdf = false, wantsCalendar = false)
 function getSmartLocalAnswer(query, wantsPdf = false, wantsCalendar = false) {
   const q = query.toLowerCase().trim();
 
-  // 1. Cálculos matemáticos dinámicos (calcula los números reales del usuario)
+  // 1. Cálculos matemáticos dinámicos
   const mathMatch = q.match(/(\d+[\.,]?\d*)\s*(\+|\-|\*|\/|x|por|entre|mas|menos|dividido)\s*(\d+[\.,]?\d*)/i);
   if (mathMatch) {
     const n1 = parseFloat(mathMatch[1].replace(',', '.'));
@@ -480,8 +427,9 @@ function getSmartLocalAnswer(query, wantsPdf = false, wantsCalendar = false) {
     return createAiResultObject(`El resultado de su cálculo es:\n\n$$${n1} ${op} ${n2} = ${r}$$`, wantsPdf, wantsCalendar);
   }
 
-  // 2. Saludos
-  if (q.includes('hola') || q.includes('buenas') || q.includes('qué tal') || q.includes('que tal')) {
+  // 2. Saludos (SOLO si el mensaje es únicamente un saludo, no una consulta completa)
+  const isOnlyGreeting = /^(hola|buenas|buenos días|buenas tardes|buenas noches|qué tal|que tal|hey|ey)\b[\s!.?]*$/i.test(q);
+  if (isOnlyGreeting) {
     const greetings = [
       '¡Hola! ¿En qué puedo ayudarte hoy?',
       '¡Hola! Estoy listo para escucharte o responder a tus preguntas.',
@@ -504,9 +452,9 @@ function getSmartLocalAnswer(query, wantsPdf = false, wantsCalendar = false) {
     return createAiResultObject(`Hoy es **${fecha}** y son las **${hora}**.`, wantsPdf, wantsCalendar);
   }
 
-  // 5. Mensaje honesto si no hay conexión a internet o la API pública está saturada
+  // 5. Mensaje si no hay conexión a internet o la API pública está saturada
   return {
-    text: `⚠️ **Aviso de Conexión:**\n\nNo he podido conectar con el servidor de inteligencia artificial en este momento (posible fallo de conexión o bloqueo en el navegador).\n\n💡 **Solución recomendada:**\nPuedes pulsar en el botón de **Configuración ⚙️** (arriba a la derecha) e ingresar tu propia clave gratuita de **Google Gemini** para obtener respuestas inmediatas y garantizadas.`,
+    text: `⚠️ **Aviso de Conexión:**\n\nNo he podido conectar con el servidor de inteligencia artificial en este momento.\n\n💡 **Solución recomendada:**\nPuedes pulsar en el botón de **Configuración ⚙️** (arriba a la derecha) e ingresar tu propia clave gratuita de **Google Gemini** para obtener respuestas inmediatas y garantizadas.`,
     speechText: 'No he podido conectar con el servidor de inteligencia artificial. Revisa tu conexión a internet o pulsa en configuración para añadir tu clave gratuita de Gemini.'
   };
 }
@@ -704,14 +652,12 @@ function escapeHtml(text) {
 // EVENT LISTENERS
 // =====================================================
 
-// Enviar mensaje escrito
 elements.chatForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const text = elements.chatInput.value.trim();
   if (text) handleUserSubmit(text, false);
 });
 
-// Micrófono de dictado (texto)
 elements.micBtn.addEventListener('click', () => {
   if (state.isRecording) {
     stopSpeechRecognizer();
@@ -724,33 +670,27 @@ elements.micBtn.addEventListener('click', () => {
   }
 });
 
-// Botón MODO VOZ (al lado de enviar)
-// touchend con preventDefault evita el click doble en móvil
 if (elements.openLiveVoiceBtn) {
   elements.openLiveVoiceBtn.addEventListener('touchend', (e) => {
     e.preventDefault();
     openLiveVoiceModal(e);
   });
   elements.openLiveVoiceBtn.addEventListener('click', (e) => {
-    // Solo se ejecuta en desktop (en móvil ya lo disparó touchend)
     if (e.pointerType !== 'touch') openLiveVoiceModal(e);
   });
 }
 
-// Cerrar modal de voz
 if (elements.closeLiveVoiceBtn) {
   elements.closeLiveVoiceBtn.addEventListener('touchend', (e) => { e.preventDefault(); closeLiveVoiceModal(e); });
   elements.closeLiveVoiceBtn.addEventListener('click',    (e) => { if (e.pointerType !== 'touch') closeLiveVoiceModal(e); });
 }
 
-// Botón repetir última respuesta en voz
 if (elements.manualSpeakBtn) {
   elements.manualSpeakBtn.addEventListener('click', () => {
     if (state.lastAiSpeechText) speakSpanishVoice(state.lastAiSpeechText);
   });
 }
 
-// Micrófono dentro del modal de voz
 elements.toggleVoiceCallMicBtn.addEventListener('click', () => {
   if (state.isRecording) {
     stopSpeechRecognizer();
