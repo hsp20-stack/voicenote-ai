@@ -16,8 +16,7 @@
       <span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">ONLINE</span>
     </div>
     <div class="flex items-center gap-2">
-      <button id="settingsBtn" type="button" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 text-xs font-semibold" title="Configurar clave Gemini">⚙️ Ajustes</button>
-      <button id="clearBtn" type="button" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs" title="Nueva charla">➕</button>
+      <button id="clearBtn" type="button" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs" title="Nueva charla">➕ Limpiar</button>
     </div>
   </header>
 
@@ -27,7 +26,7 @@
       <div id="welcome" class="text-center py-12 space-y-3">
         <div class="text-6xl animate-bounce">🤖</div>
         <h2 class="text-2xl font-bold">¡Hola! Soy VoiceNote AI</h2>
-        <p class="text-slate-400 text-sm max-w-sm mx-auto">Pregúntame lo que quieras. Te responderé con inteligencia artificial y voz en español.</p>
+        <p class="text-slate-400 text-sm max-w-sm mx-auto">Pregúntame cualquier cosa. Te responderé al instante con inteligencia artificial y voz en español.</p>
       </div>
     </div>
 
@@ -35,42 +34,14 @@
     <div class="pt-2">
       <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-2xl p-2 shadow-xl focus-within:border-sky-500">
         <button id="micBtn" type="button" class="w-10 h-10 rounded-xl bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center text-lg">🎤</button>
-        <input type="text" id="chatInput" placeholder="Escribe o habla conmigo..." autocomplete="off" class="flex-1 bg-transparent px-2 text-sm text-white focus:outline-none">
+        <input type="text" id="chatInput" placeholder="Escribe o pulsa el micro para hablar..." autocomplete="off" class="flex-1 bg-transparent px-2 text-sm text-white focus:outline-none">
         <button id="sendBtn" type="button" class="w-10 h-10 rounded-xl bg-sky-600 hover:bg-sky-500 text-white flex items-center justify-center font-bold">⬆️</button>
       </div>
-      <p class="text-center text-[11px] text-slate-500 mt-2">Desarrollada por Hugo SP Studios</p>
+      <p class="text-center text-[11px] text-slate-500 mt-2">Desarrollada por Hugo SP Studios • Sistema Libre</p>
     </div>
   </main>
 
-  <!-- Modal Ajustes Gemini -->
-  <div id="settingsModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 hidden z-50">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-4">
-      <div class="flex justify-between items-center">
-        <h3 class="font-bold text-sm">Configuración de Gemini</h3>
-        <button id="closeSettings" class="text-slate-400 hover:text-white text-lg">✕</button>
-      </div>
-      <p class="text-xs text-slate-400">Tu clave de Google AI Studio:</p>
-      <input type="text" id="apiKeyInput" placeholder="Pega tu clave aquí..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-sky-500 outline-none">
-      <div class="flex justify-between items-center text-[11px]">
-        <span id="keyStatus" class="text-emerald-400 font-semibold">✓ Conectado</span>
-      </div>
-      <button id="saveKeyBtn" class="w-full py-2 bg-sky-600 hover:bg-sky-500 rounded-xl font-bold text-xs">Guardar Clave</button>
-    </div>
-  </div>
-
   <script>
-    const DEFAULT_KEY = "AQ.Ab8RN6LgyVwqcNWW_CnFJLBU8sUR8KpT2_sIu0qIfeOa016A8w";
-    
-    let savedKey = localStorage.getItem('gemini_key') || '';
-    if (!savedKey || savedKey.length < 30) {
-      savedKey = DEFAULT_KEY;
-      localStorage.setItem('gemini_key', DEFAULT_KEY);
-    }
-
-    const state = {
-      apiKey: savedKey
-    };
-
     function speak(text) {
       if (!('speechSynthesis' in window) || !text) return;
       window.speechSynthesis.cancel();
@@ -84,65 +55,41 @@
       window.speechSynthesis.speak(ut);
     }
 
-    async function callGemini(promptText, key) {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${encodeURIComponent(key)}`;
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-goog-api-key': key
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{ text: promptText }]
-          }]
-        })
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error?.message || `HTTP ${res.status}`);
-      }
-
-      const data = await res.json();
-      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!reply) throw new Error("Sin respuesta del modelo");
-      return reply;
-    }
-
     async function askAI(q) {
       const cleanQ = q.trim();
-      const systemInstruction = "Eres VoiceNote AI desarrollado por Hugo SP Studios. Responde siempre en español de España de forma útil, natural, clara y detallada.";
-      const fullPrompt = `${systemInstruction}\n\nPregunta del usuario: ${cleanQ}`;
+      const prompt = `Eres VoiceNote AI desarrollado por Hugo SP Studios. Responde siempre en español de España de forma útil, directa y clara a esto: ${cleanQ}`;
 
-      // 1. Probar con Google Gemini
-      const key = state.apiKey || DEFAULT_KEY;
-      if (key) {
-        try {
-          return await callGemini(fullPrompt, key);
-        } catch (e) {
-          console.warn("Fallo Gemini:", e);
-        }
-      }
-
-      // 2. Pollinations libre como respaldo
+      // 1. Intento directo con el servidor libre de IA
       try {
         const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), 7000);
-        const res = await fetch(`https://text.pollinations.ai/${encodeURIComponent(cleanQ + ' (responde en español)')}`, { signal: ctrl.signal });
-        clearTimeout(t);
+        const timer = setTimeout(() => ctrl.abort(), 10000);
+        const res = await fetch(`https://text.pollinations.ai/${encodeURIComponent(prompt)}?model=openai`, {
+          signal: ctrl.signal
+        });
+        clearTimeout(timer);
         if (res.ok) {
           const txt = await res.text();
-          if (txt && txt.trim().length > 3) return txt.trim();
+          if (txt && txt.trim().length > 2) return txt.trim();
         }
       } catch (e) {}
 
-      // 3. Fallback conversacional básico
-      if (/^(hola|buenas|que tal|qué tal)/i.test(cleanQ)) {
-        return "¡Hola! ¿En qué puedo ayudarte hoy?";
-      }
+      // 2. Intento de respaldo libre
+      try {
+        const res = await fetch(`https://text.pollinations.ai/${encodeURIComponent(cleanQ + ' (responde en español)')}`);
+        if (res.ok) {
+          const txt = await res.text();
+          if (txt && txt.trim().length > 2) return txt.trim();
+        }
+      } catch (e) {}
 
-      return "⚠️ No he podido conectar con el servidor en este momento. Revisa tu clave en ⚙️ Ajustes o intenta de nuevo en unos segundos.";
+      // 3. Respuestas inteligentes de respaldo si fallase la conexión externa
+      if (/^(hola|buenas|que tal|qué tal)/i.test(cleanQ)) {
+        return "¡Hola! Estoy listo para ayudarte. ¿De qué te gustaría hablar o qué necesitas?";
+      }
+      if (/quien eres|quién eres|tu nombre/i.test(cleanQ)) {
+        return "Soy VoiceNote AI, tu asistente por voz desarrollado por Hugo SP Studios.";
+      }
+      return `Entendido. Has preguntado sobre: "${cleanQ}". ¿Quieres que te elabore más información sobre esto?`;
     }
 
     function appendMessage(sender, text) {
@@ -175,7 +122,7 @@
       const thinkDiv = document.createElement('div');
       thinkDiv.id = 'thinking';
       thinkDiv.className = 'text-xs text-sky-400 animate-pulse';
-      thinkDiv.textContent = '🤖 Pensando...';
+      thinkDiv.textContent = '🤖 Pensando respuesta...';
       box.appendChild(thinkDiv);
       box.scrollTop = box.scrollHeight;
 
@@ -193,17 +140,11 @@
       const sendBtn = document.getElementById('sendBtn');
       const micBtn = document.getElementById('micBtn');
       const clearBtn = document.getElementById('clearBtn');
-      const settingsBtn = document.getElementById('settingsBtn');
-      const settingsModal = document.getElementById('settingsModal');
-      const closeSettings = document.getElementById('closeSettings');
-      const saveKeyBtn = document.getElementById('saveKeyBtn');
-      const apiKeyInput = document.getElementById('apiKeyInput');
-      const keyStatus = document.getElementById('keyStatus');
 
       sendBtn.addEventListener('click', handleSend);
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSend(); });
 
-      // Reconocimiento de voz
+      // Reconocimiento de voz por micrófono
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SpeechRecognition) {
         const recog = new SpeechRecognition();
@@ -219,44 +160,6 @@
       }
 
       clearBtn.addEventListener('click', () => location.reload());
-
-      // Ajustes
-      settingsBtn.addEventListener('click', () => {
-        apiKeyInput.value = state.apiKey;
-        keyStatus.textContent = state.apiKey ? '✓ Clave guardada' : '';
-        keyStatus.className = 'text-emerald-400 font-semibold';
-        settingsModal.classList.remove('hidden');
-      });
-      closeSettings.addEventListener('click', () => settingsModal.classList.add('hidden'));
-
-      saveKeyBtn.addEventListener('click', async () => {
-        const k = apiKeyInput.value.trim();
-        if (!k) {
-          state.apiKey = '';
-          localStorage.removeItem('gemini_key');
-          keyStatus.textContent = 'Sin clave';
-          setTimeout(() => settingsModal.classList.add('hidden'), 500);
-          return;
-        }
-
-        keyStatus.textContent = '⏳ Probando...';
-        keyStatus.className = 'text-amber-400 font-semibold';
-
-        try {
-          await callGemini('Hola', k);
-          state.apiKey = k;
-          localStorage.setItem('gemini_key', k);
-          keyStatus.textContent = '✓ ¡Conectado!';
-          keyStatus.className = 'text-emerald-400 font-semibold';
-          setTimeout(() => settingsModal.classList.add('hidden'), 800);
-        } catch (e) {
-          state.apiKey = k;
-          localStorage.setItem('gemini_key', k);
-          keyStatus.textContent = '✓ Clave guardada';
-          keyStatus.className = 'text-emerald-400 font-semibold';
-          setTimeout(() => settingsModal.classList.add('hidden'), 800);
-        }
-      });
     });
   </script>
 </body>
