@@ -2,83 +2,236 @@
 <html lang="es" class="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>VoiceNote AI - Tu Asistente con Voz en Castellano</title>
-  <meta name="description" content="IA conversacional con voz hablada en castellano. Desarrollada por Hugo SP Studios.">
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0284c7">
-  <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="icon" type="image/png" href="icon.png">
-
-  <!-- Tailwind CSS CDN -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VoiceNote AI</title>
   <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#0b1329] text-white min-h-screen flex flex-col font-sans">
+
+  <header class="border-b border-slate-800 bg-[#0b1329] px-4 py-3 flex items-center justify-between sticky top-0 z-20">
+    <div class="flex items-center gap-2">
+      <div class="w-8 h-8 rounded-xl bg-sky-600 flex items-center justify-center font-bold">🎙️</div>
+      <span class="font-extrabold text-base">VoiceNote AI</span>
+      <span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">v3.0 LISTA</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="settingsBtn" type="button" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 text-xs font-semibold">⚙️ Ajustes</button>
+      <button id="clearBtn" type="button" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300">➕</button>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-3xl w-full mx-auto p-4 flex flex-col justify-between">
+    <div id="chatMessages" class="flex-1 overflow-y-auto space-y-4 pb-4">
+      <div id="welcome" class="text-center py-12 space-y-3">
+        <div class="text-6xl animate-bounce">🤖</div>
+        <h2 class="text-2xl font-bold">¡Hola! Soy VoiceNote AI</h2>
+        <p class="text-slate-400 text-sm max-w-sm mx-auto">Pregúntame cualquier cosa o pídeme planes y te responderé con voz en castellano.</p>
+      </div>
+    </div>
+
+    <div class="pt-2">
+      <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-2xl p-2 shadow-xl focus-within:border-sky-500">
+        <button id="micBtn" type="button" class="w-10 h-10 rounded-xl bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center text-lg">🎤</button>
+        <input type="text" id="chatInput" placeholder="Escribe o habla conmigo..." autocomplete="off" class="flex-1 bg-transparent px-2 text-sm text-white focus:outline-none">
+        <button id="sendBtn" type="button" class="w-10 h-10 rounded-xl bg-sky-600 hover:bg-sky-500 text-white flex items-center justify-center font-bold">⬆️</button>
+      </div>
+      <p class="text-center text-[11px] text-slate-500 mt-2">Desarrollada por Hugo SP Studios</p>
+    </div>
+  </main>
+
+  <div id="settingsModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 hidden z-50">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="font-bold text-sm">Configuración de Google Gemini</h3>
+        <button id="closeSettings" class="text-slate-400 hover:text-white text-lg">✕</button>
+      </div>
+      <p class="text-xs text-slate-400">Pega aquí tu clave gratuita de Google Gemini para respuestas ultra rápidas:</p>
+      <input type="text" id="apiKeyInput" placeholder="AIzaSy..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-sky-500 outline-none">
+      <div class="flex justify-between items-center text-[11px]">
+        <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-sky-400 underline">Obtener clave gratis</a>
+        <span id="keyStatus" class="text-emerald-400 font-semibold"></span>
+      </div>
+      <button id="saveKeyBtn" class="w-full py-2 bg-sky-600 hover:bg-sky-500 rounded-xl font-bold text-xs">Guardar Clave</button>
+    </div>
+  </div>
+
   <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            brand: {
-              500: '#0284c7',
-              600: '#0369a1',
-              700: '#075985',
-            }
-          },
-          animation: {
-            'orb-pulse': 'orbPulse 2.5s ease-in-out infinite',
-            'orb-glow': 'orbGlow 2s ease-in-out infinite',
-          },
-          keyframes: {
-            orbPulse: {
-              '0%, 100%': { transform: 'scale(1)', opacity: '0.9' },
-              '50%': { transform: 'scale(1.15)', opacity: '1' },
-            },
-            orbGlow: {
-              '0%, 100%': { filter: 'drop-shadow(0 0 35px rgba(56, 189, 248, 0.6))' },
-              '50%': { filter: 'drop-shadow(0 0 75px rgba(14, 165, 233, 0.95))' },
-            }
+    const state = {
+      apiKey: localStorage.getItem('gemini_key') || ''
+    };
+
+    function speak(text) {
+      if (!('speechSynthesis' in window) || !text) return;
+      window.speechSynthesis.cancel();
+      const clean = text.replace(/[*_#•`\\]/g, '').slice(0, 350);
+      const ut = new SpeechSynthesisUtterance(clean);
+      ut.lang = 'es-ES';
+      ut.rate = 0.95;
+      const voices = window.speechSynthesis.getVoices();
+      const v = voices.find(x => x.lang.startsWith('es'));
+      if (v) ut.voice = v;
+      window.speechSynthesis.speak(ut);
+    }
+
+    async function askAI(q) {
+      const cleanQ = q.trim();
+      const systemPrompt = "Eres VoiceNote AI desarrollado por Hugo SP Studios. Responde siempre en castellano de España, con información útil, clara, directa y detallada.";
+
+      if (state.apiKey) {
+        try {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(state.apiKey.trim())}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\nPregunta: ${cleanQ}` }] }] })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (reply) return reply;
+          } else {
+            const err = await res.json().catch(() => ({}));
+            return `❌ **Error de clave Gemini (${res.status}):** ${err.error?.message || 'Clave no válida'}. Toca en ⚙️ Ajustes para corregirla.`;
           }
+        } catch (e) {
+          console.warn('Gemini error:', e);
         }
       }
-    }
-  </script>
-  <!-- Lucide Icons CDN -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- jsPDF CDN para generar PDFs -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <!-- KaTeX CDN para Renderizar Fórmulas -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
 
-  <style>
-    body {
-      background-color: #0b1329;
-      color: #f8fafc;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      -webkit-font-smoothing: antialiased;
-    }
-    @keyframes robotFloat {
-      0%, 100% { transform: translateY(0px); }
-      50%       { transform: translateY(-6px); }
-    }
-    #robotWink {
-      animation: robotFloat 3.5s ease-in-out infinite;
-    }
-    ::-webkit-scrollbar { width: 5px; height: 5px; }
-    ::-webkit-scrollbar-thumb { background: rgba(14, 165, 233, 0.3); border-radius: 9999px; }
-  </style>
-</head>
-<body class="bg-[#0b1329] text-slate-100 min-h-screen flex flex-col font-sans selection:bg-sky-500 selection:text-white">
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 8000);
+        const res = await fetch(`https://text.pollinations.ai/${encodeURIComponent(cleanQ + ' (responde en castellano)')}`, { signal: ctrl.signal });
+        clearTimeout(t);
+        if (res.ok) {
+          const txt = await res.text();
+          if (txt && txt.trim().length > 3) return txt.trim();
+        }
+      } catch (e) {}
 
-  <!-- Header Superior -->
-  <header class="border-b border-sky-950/80 bg-[#0b1329]/90 backdrop-blur-md sticky top-0 z-40">
-    <div class="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-      <div class="flex items-center gap-2.5">
-        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-600 to-blue-500 flex items-center justify-center shadow-md shadow-sky-500/30">
-          <i data-lucide="bot" class="w-5 h-5 text-white"></i>
+      if (/^(hola|buenas|qué tal|que tal)/i.test(cleanQ) && cleanQ.split(' ').length <= 2) {
+        return "¡Hola! ¿En qué puedo ayudarte hoy?";
+      }
+
+      return "⚠️ **No se pudo conectar con la IA.**\n\nPor favor toca el botón **⚙️ Ajustes** arriba y pega tu clave gratuita de Google Gemini para tener respuestas instantáneas garantizadas.";
+    }
+
+    function appendMessage(sender, text) {
+      const welcome = document.getElementById('welcome');
+      if (welcome) welcome.remove();
+
+      const box = document.getElementById('chatMessages');
+      const div = document.createElement('div');
+      div.className = sender === 'user' ? 'flex justify-end' : 'flex justify-start';
+
+      const bg = sender === 'user' ? 'bg-sky-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-200';
+      div.innerHTML = `
+        <div class="max-w-[85%] p-3 rounded-2xl ${bg} text-sm whitespace-pre-wrap leading-relaxed shadow">
+          ${text.replace(/\n/g, '<br>')}
         </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <span class="font-extrabold text-sm sm:text-base tracking-tight text-white">VoiceNote AI</span>
-            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg
+      `;
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    async function handleSend() {
+      const input = document.getElementById('chatInput');
+      const q = input.value.trim();
+      if (!q) return;
+
+      appendMessage('user', q);
+      input.value = '';
+
+      const box = document.getElementById('chatMessages');
+      const thinkDiv = document.createElement('div');
+      thinkDiv.id = 'thinking';
+      thinkDiv.className = 'text-xs text-sky-400 animate-pulse';
+      thinkDiv.textContent = '🤖 Pensando respuesta...';
+      box.appendChild(thinkDiv);
+      box.scrollTop = box.scrollHeight;
+
+      const reply = await askAI(q);
+
+      const el = document.getElementById('thinking');
+      if (el) el.remove();
+
+      appendMessage('ai', reply);
+      speak(reply);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const input = document.getElementById('chatInput');
+      const sendBtn = document.getElementById('sendBtn');
+      const micBtn = document.getElementById('micBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      const settingsBtn = document.getElementById('settingsBtn');
+      const settingsModal = document.getElementById('settingsModal');
+      const closeSettings = document.getElementById('closeSettings');
+      const saveKeyBtn = document.getElementById('saveKeyBtn');
+      const apiKeyInput = document.getElementById('apiKeyInput');
+      const keyStatus = document.getElementById('keyStatus');
+
+      sendBtn.addEventListener('click', handleSend);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSend(); });
+
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const recog = new SpeechRecognition();
+        recog.lang = 'es-ES';
+        recog.onresult = (e) => {
+          input.value = e.results[0][0].transcript;
+          handleSend();
+        };
+        micBtn.addEventListener('click', () => {
+          try { recog.start(); micBtn.textContent = '🔴'; } catch (e) { recog.stop(); micBtn.textContent = '🎤'; }
+        });
+        recog.onend = () => { micBtn.textContent = '🎤'; };
+      }
+
+      clearBtn.addEventListener('click', () => location.reload());
+
+      settingsBtn.addEventListener('click', () => {
+        apiKeyInput.value = state.apiKey;
+        keyStatus.textContent = state.apiKey ? '✓ Clave guardada' : '';
+        settingsModal.classList.remove('hidden');
+      });
+      closeSettings.addEventListener('click', () => settingsModal.classList.add('hidden'));
+
+      saveKeyBtn.addEventListener('click', async () => {
+        const k = apiKeyInput.value.trim();
+        if (!k) {
+          state.apiKey = '';
+          localStorage.removeItem('gemini_key');
+          keyStatus.textContent = 'Modo libre';
+          setTimeout(() => settingsModal.classList.add('hidden'), 500);
+          return;
+        }
+
+        keyStatus.textContent = '⏳ Probando...';
+        keyStatus.className = 'text-amber-400 font-semibold';
+
+        try {
+          const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(k)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'hola' }] }] })
+          });
+          if (r.ok) {
+            state.apiKey = k;
+            localStorage.setItem('gemini_key', k);
+            keyStatus.textContent = '✓ ¡Conectado!';
+            keyStatus.className = 'text-emerald-400 font-semibold';
+            setTimeout(() => settingsModal.classList.add('hidden'), 800);
+          } else {
+            keyStatus.textContent = '❌ Clave no válida';
+            keyStatus.className = 'text-rose-400 font-semibold';
+          }
+        } catch (e) {
+          state.apiKey = k;
+          localStorage.setItem('gemini_key', k);
+          settingsModal.classList.add('hidden');
+        }
+      });
+    });
+  </script>
+</body>
+</html>
