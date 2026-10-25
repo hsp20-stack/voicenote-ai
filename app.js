@@ -1,10 +1,11 @@
 /**
  * VoiceNote AI - Tu Asistente con Voz Hablada en Castellano
  * Desarrollada por Hugo SP Studios.
- * - Modo Voz en Directo (al lado de enviar) con voz humana en castellano
- * - Cambio de sesión de audio optimizado para iPhone/Safari (200ms switch)
- * - Respuestas matemáticas y explicaciones habladas fluidas
+ * Fix iOS Safari: la voz se activa SINCRÓNICAMENTE en el gesto del usuario
  */
+
+// Utterance global para evitar que el Garbage Collector de iOS lo cancele
+let _currentUtterance = null;
 
 const state = {
   language: 'es-ES',
@@ -12,166 +13,177 @@ const state = {
   isRecording: false,
   isAiSpeaking: false,
   recognition: null,
-  availableVoices: [],
   lastAiSpeechText: ''
 };
 
 // --- DOM References ---
 const elements = {
-  chatMessages: document.getElementById('chatMessages'),
-  welcomeScreen: document.getElementById('welcomeScreen'),
-  chatForm: document.getElementById('chatForm'),
-  chatInput: document.getElementById('chatInput'),
-  micBtn: document.getElementById('micBtn'),
-  micIcon: document.getElementById('micIcon'),
-  sendBtn: document.getElementById('sendBtn'),
-  openLiveVoiceBtn: document.getElementById('openLiveVoiceBtn'),
-  clearChatBtn: document.getElementById('clearChatBtn'),
-  
-  // Live Voice Modal
-  liveVoiceModal: document.getElementById('liveVoiceModal'),
-  closeLiveVoiceBtn: document.getElementById('closeLiveVoiceBtn'),
-  toggleVoiceCallMicBtn: document.getElementById('toggleVoiceCallMicBtn'),
-  callMicIcon: document.getElementById('callMicIcon'),
-  voiceOrb: document.getElementById('voiceOrb'),
-  voiceStatusText: document.getElementById('voiceStatusText'),
-  voiceTranscriptPreview: document.getElementById('voiceTranscriptPreview'),
-  orbCenterIcon: document.getElementById('orbCenterIcon'),
-  manualSpeakBtn: document.getElementById('manualSpeakBtn')
+  chatMessages:         document.getElementById('chatMessages'),
+  welcomeScreen:        document.getElementById('welcomeScreen'),
+  chatForm:             document.getElementById('chatForm'),
+  chatInput:            document.getElementById('chatInput'),
+  micBtn:               document.getElementById('micBtn'),
+  micIcon:              document.getElementById('micIcon'),
+  sendBtn:              document.getElementById('sendBtn'),
+  openLiveVoiceBtn:     document.getElementById('openLiveVoiceBtn'),
+  clearChatBtn:         document.getElementById('clearChatBtn'),
+  liveVoiceModal:       document.getElementById('liveVoiceModal'),
+  closeLiveVoiceBtn:    document.getElementById('closeLiveVoiceBtn'),
+  toggleVoiceCallMicBtn:document.getElementById('toggleVoiceCallMicBtn'),
+  callMicIcon:          document.getElementById('callMicIcon'),
+  voiceOrb:             document.getElementById('voiceOrb'),
+  voiceStatusText:      document.getElementById('voiceStatusText'),
+  voiceTranscriptPreview:document.getElementById('voiceTranscriptPreview'),
+  orbCenterIcon:        document.getElementById('orbCenterIcon'),
+  manualSpeakBtn:       document.getElementById('manualSpeakBtn')
 };
 
 function refreshIcons() {
   if (window.lucide) window.lucide.createIcons();
 }
 
-// --- KaTeX Math Auto-Renderer ---
+// --- KaTeX Math Renderer ---
 function renderMathFormulas(element) {
   if (window.renderMathInElement && element) {
     try {
       window.renderMathInElement(element, {
         delimiters: [
           { left: '$$', right: '$$', display: true },
-          { left: '$', right: '$', display: false }
+          { left: '$',  right: '$',  display: false }
         ],
         throwOnError: false
       });
-    } catch (e) {
-      console.warn('KaTeX render warning:', e);
-    }
+    } catch (e) {}
   }
 }
 
-// --- Voice Engine: Carga de Voces en Castellano ---
+// =====================================================
+// MOTOR DE VOZ — Fix iOS Safari
+// Regla de oro: speak() debe llamarse en el mismo tick
+// que el gesto del usuario (click/touchend)
+// =====================================================
+
+// 1. Carga de voces (se dispara en cuanto el navegador las tiene)
 function initVoices() {
-  if ('speechSynthesis' in window) {
-    const loadVoices = () => {
-      state.availableVoices = window.speechSynthesis.getVoices();
-    };
-    loadVoices();
-    window.speechSynthesis.onvoiceschanged = loadVoices;
-  }
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.getVoices(); // trigger load
+  window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
 }
 
-// Reproducción de voz humana en Castellano (optimizada para iOS y Android)
+// 2. Selecciona la mejor voz en español disponible
+function getBestSpanishVoice() {
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+
+  // Preferencia: voces de España con nombre conocido
+  const preferred = voices.find(v =>
+    v.lang.toLowerCase().startsWith('es') &&
+    (v.name.includes('Monica')  || v.name.includes('Mónica')  ||
+     v.name.includes('Jorge')   || v.name.includes('Spain')   ||
+     v.name.includes('España')  || v.name.includes('Siri')    ||
+     v.name.includes('Google español') || v.name.includes('es-ES'))
+  );
+  // Fallback: cualquier voz en español
+  return preferred || voices.find(v => v.lang.toLowerCase().startsWith('es')) || null;
+}
+
+// 3. Función principal de habla — SIEMPRE llamar en gesto directo del usuario
 function speakSpanishVoice(text, onEndCallback = null) {
   if (!('speechSynthesis' in window) || !text) {
     if (onEndCallback) onEndCallback();
     return;
   }
 
-  // Detener el micrófono antes de hablar para que Safari no silencie el altavoz
-  stopSpeechRecognizer();
-
+  // Detener síntesis previa
   window.speechSynthesis.cancel();
-  window.speechSynthesis.resume();
-  state.isAiSpeaking = true;
-  state.lastAiSpeechText = text;
 
-  if (elements.manualSpeakBtn) {
-    elements.manualSpeakBtn.classList.remove('hidden');
-  }
-
-  if (state.isLiveCallActive) {
-    elements.voiceStatusText.textContent = "VoiceNote AI te está hablando en castellano...";
-    elements.voiceOrb.className = "w-48 h-48 sm:w-56 sm:h-56 rounded-full bg-gradient-to-tr from-cyan-400 via-sky-500 to-blue-600 animate-orb-glow flex items-center justify-center relative cursor-pointer shadow-2xl transition-all scale-105";
-    elements.orbCenterIcon.setAttribute('data-lucide', 'volume-2');
-    refreshIcons();
-  }
-
-  // Limpiar texto para pronunciación perfecta en castellano
+  // Limpiar texto de LaTeX y markdown para pronunciación natural
   const clean = text
-    .replace(/\$\$.*?\$\$/g, '')
-    .replace(/\$.*?\$/g, '')
+    .replace(/\$\$[\s\S]*?\$\$/g, '')
+    .replace(/\$[^$]*?\$/g, '')
     .replace(/[*_#•`]/g, '')
     .replace(/\[.*?\]\(.*?\)/g, '')
     .replace(/\\frac\{(.*?)\}\{(.*?)\}/g, '$1 sobre $2')
     .replace(/\\pi/g, 'pi')
     .replace(/\\sin/g, 'seno')
     .replace(/\\cos/g, 'coseno')
-    .slice(0, 500);
+    .replace(/\\tan/g, 'tangente')
+    .replace(/\n+/g, '. ')
+    .replace(/#{1,3}\s/g, '')
+    .trim()
+    .slice(0, 450);
 
-  const utterance = new SpeechSynthesisUtterance(clean);
-  utterance.lang = 'es-ES'; // Castellano estándar de España
-  utterance.rate = 0.98;     // Velocidad natural humana
-  utterance.pitch = 1.0;
+  if (!clean) { if (onEndCallback) onEndCallback(); return; }
 
-  // Seleccionar la mejor voz disponible en español
-  if (state.availableVoices.length > 0) {
-    const spanishVoice = state.availableVoices.find(v => 
-      v.lang.toLowerCase().startsWith('es') && 
-      (v.name.includes('Spain') || v.name.includes('España') || v.name.includes('Mónica') || v.name.includes('Monica') || v.name.includes('Jorge') || v.name.includes('Siri') || v.name.includes('Google español'))
-    ) || state.availableVoices.find(v => v.lang.toLowerCase().startsWith('es'));
+  // Crear utterance y guardarlo globalmente (evita GC en iOS)
+  _currentUtterance = new SpeechSynthesisUtterance(clean);
+  _currentUtterance.lang  = 'es-ES';
+  _currentUtterance.rate  = 0.95;
+  _currentUtterance.pitch = 1.05;
+  _currentUtterance.volume = 1.0;
 
-    if (spanishVoice) utterance.voice = spanishVoice;
+  const voice = getBestSpanishVoice();
+  if (voice) _currentUtterance.voice = voice;
+
+  state.isAiSpeaking = true;
+  state.lastAiSpeechText = text;
+
+  // Actualizar UI del orbe
+  if (state.isLiveCallActive) {
+    elements.voiceStatusText.textContent = '🔊 Hablándote en castellano...';
+    elements.voiceOrb.className = 'w-48 h-48 sm:w-56 sm:h-56 rounded-full bg-gradient-to-tr from-cyan-400 via-sky-500 to-blue-600 animate-orb-glow flex items-center justify-center relative cursor-pointer shadow-2xl transition-all scale-110';
+    elements.orbCenterIcon.setAttribute('data-lucide', 'volume-2');
+    refreshIcons();
   }
 
-  utterance.onend = () => {
+  _currentUtterance.onend = () => {
     state.isAiSpeaking = false;
     if (state.isLiveCallActive) {
-      elements.voiceStatusText.textContent = "¡Te escucho! Dime lo que quieras...";
-      elements.voiceOrb.className = "w-48 h-48 sm:w-56 sm:h-56 rounded-full bg-gradient-to-tr from-sky-400 via-blue-600 to-cyan-300 animate-orb-pulse animate-orb-glow flex items-center justify-center relative cursor-pointer shadow-2xl transition-all";
+      elements.voiceStatusText.textContent = '🎤 Te escucho... habla ahora';
+      elements.voiceOrb.className = 'w-48 h-48 sm:w-56 sm:h-56 rounded-full bg-gradient-to-tr from-sky-400 via-blue-600 to-cyan-300 animate-orb-pulse animate-orb-glow flex items-center justify-center relative cursor-pointer shadow-2xl transition-all';
       elements.orbCenterIcon.setAttribute('data-lucide', 'mic');
       refreshIcons();
-
-      // En iPhone, esperar 300ms para que Safari libere el altavoz y abra el micrófono
       setTimeout(() => {
-        if (state.isLiveCallActive && !state.isAiSpeaking) {
-          startSpeechRecognizer();
-        }
-      }, 350);
+        if (state.isLiveCallActive && !state.isAiSpeaking) startSpeechRecognizer();
+      }, 400);
     }
     if (onEndCallback) onEndCallback();
   };
 
-  utterance.onerror = () => {
+  _currentUtterance.onerror = (e) => {
+    console.warn('Speech error:', e.error);
     state.isAiSpeaking = false;
     if (onEndCallback) onEndCallback();
   };
 
-  window.speechSynthesis.speak(utterance);
+  // Speak — debe estar en el mismo stack call del gesto del usuario
+  window.speechSynthesis.speak(_currentUtterance);
+
+  // Workaround Chrome/Android: keepalive cada 10s para evitar que se corte
+  const keepAlive = setInterval(() => {
+    if (!state.isAiSpeaking) { clearInterval(keepAlive); return; }
+    window.speechSynthesis.pause();
+    window.speechSynthesis.resume();
+  }, 10000);
 }
 
-// --- Speech Recognition ---
+// --- Reconocimiento de Voz ---
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 function setupSpeechRecognition() {
   if (!SpeechRecognition) return null;
   const recog = new SpeechRecognition();
-  recog.continuous = false;
-  recog.interimResults = true;
-  recog.lang = 'es-ES';
+  recog.continuous      = false;
+  recog.interimResults  = true;
+  recog.lang            = 'es-ES';
 
   recog.onresult = (event) => {
-    let interim = '';
-    let final = '';
-
+    let interim = '', final = '';
     for (let i = event.resultIndex; i < event.results.length; ++i) {
-      if (event.results[i].isFinal) final += event.results[i][0].transcript;
-      else interim += event.results[i][0].transcript;
+      if (event.results[i].isFinal) final  += event.results[i][0].transcript;
+      else                          interim += event.results[i][0].transcript;
     }
-
     const currentText = (final || interim).trim();
-
     if (state.isLiveCallActive) {
       elements.voiceTranscriptPreview.textContent = `"${currentText}"`;
     } else {
@@ -181,10 +193,10 @@ function setupSpeechRecognition() {
 
   recog.onend = () => {
     state.isRecording = false;
-
     if (state.isLiveCallActive) {
       const recognized = elements.voiceTranscriptPreview.textContent.replace(/^"|"$/g, '').trim();
-      if (recognized && !recognized.startsWith('Háblame') && !recognized.startsWith('Dime lo que quieras') && !state.isAiSpeaking) {
+      const isPlaceholder = recognized.startsWith('Háblame') || recognized.startsWith('"Háblame') || recognized === '';
+      if (recognized && !isPlaceholder && !state.isAiSpeaking) {
         handleVoiceExchange(recognized);
       }
     } else {
@@ -192,13 +204,12 @@ function setupSpeechRecognition() {
       elements.micBtn.classList.add('bg-slate-800', 'text-slate-300');
       elements.micIcon.setAttribute('data-lucide', 'mic');
       refreshIcons();
-
       const text = elements.chatInput.value.trim();
       if (text) handleUserSubmit(text, true);
     }
   };
 
-  recog.onerror = () => {
+  recog.onerror = (e) => {
     state.isRecording = false;
     if (!state.isLiveCallActive) {
       elements.micBtn.classList.remove('bg-red-500', 'text-white', 'animate-pulse');
@@ -214,265 +225,249 @@ function setupSpeechRecognition() {
 function startSpeechRecognizer() {
   if (state.isAiSpeaking) return;
   if (!state.recognition) state.recognition = setupSpeechRecognition();
-
-  if (state.recognition) {
-    state.recognition.lang = 'es-ES';
-    try {
-      state.isRecording = true;
-      state.recognition.start();
-    } catch (e) {}
+  if (!state.recognition) return;
+  state.recognition.lang = 'es-ES';
+  try {
+    state.isRecording = true;
+    state.recognition.start();
+  } catch (e) {
+    state.isRecording = false;
   }
 }
 
 function stopSpeechRecognizer() {
   state.isRecording = false;
   if (state.recognition) {
-    try { state.recognition.stop(); } catch (e) {}
+    try { state.recognition.abort(); } catch (e) {}
   }
 }
 
-// --- Live Voice Mode Controls (El apartado al lado de Enviar) ---
+// =====================================================
+// MODAL DE VOZ — Fix iOS: speak() en el mismo gesto
+// =====================================================
 function openLiveVoiceModal(e) {
-  if (e) {
-    e.preventDefault();
-    e.stopPropagation();
-  }
+  if (e) { e.preventDefault(); e.stopPropagation(); }
 
+  // Evitar doble apertura
+  if (state.isLiveCallActive) return;
   state.isLiveCallActive = true;
-  const modal = document.getElementById('liveVoiceModal');
-  if (modal) {
-    modal.classList.remove('hidden');
-    modal.style.display = 'flex';
-  }
 
-  const greeting = '¡Hola! Te escucho perfectamente. Dime lo que quieras y te hablo en castellano.';
-  elements.voiceStatusText.textContent = "VoiceNote AI te está hablando...";
+  // Detener reconocimiento si estaba activo
+  stopSpeechRecognizer();
+
+  // Mostrar modal
+  elements.liveVoiceModal.classList.remove('hidden');
+  elements.liveVoiceModal.style.display = 'flex';
+
+  const greeting = 'Hola. Estoy aquí. Dime lo que quieras y te respondo con mi voz.';
+  elements.voiceStatusText.textContent = '🔊 Hablándote en castellano...';
   elements.voiceTranscriptPreview.textContent = `"${greeting}"`;
 
-  // Reproducir directamente el saludo con voz en castellano en este toque
+  // ✅ CLAVE iOS: speak() se llama AQUÍ, en el mismo handler del toque del usuario
   speakSpanishVoice(greeting, () => {
     if (state.isLiveCallActive) {
-      elements.voiceStatusText.textContent = "¡Te escucho! Háblame ahora...";
+      elements.voiceStatusText.textContent = '🎤 Te escucho... habla ahora';
       startSpeechRecognizer();
     }
   });
 }
 
 function closeLiveVoiceModal(e) {
-  if (e) {
-    e.preventDefault();
-    e.stopPropagation();
-  }
-
+  if (e) { e.preventDefault(); e.stopPropagation(); }
   state.isLiveCallActive = false;
   window.speechSynthesis.cancel();
   stopSpeechRecognizer();
-
-  const modal = document.getElementById('liveVoiceModal');
-  if (modal) {
-    modal.classList.add('hidden');
-    modal.style.display = 'none';
-  }
+  elements.liveVoiceModal.classList.add('hidden');
+  elements.liveVoiceModal.style.display = 'none';
 }
 
-// Conversación dentro del apartado del Orbe (Pura voz humana)
+// Conversación por voz dentro del orbe
 async function handleVoiceExchange(userText) {
   if (!userText || state.isAiSpeaking) return;
-
   if (elements.welcomeScreen) elements.welcomeScreen.remove();
-  appendMessageBubble('user', userText, true);
 
-  elements.voiceStatusText.textContent = "Pensando qué responderte...";
-  elements.voiceOrb.className = "w-48 h-48 sm:w-56 sm:h-56 rounded-full bg-gradient-to-tr from-indigo-500 via-sky-500 to-pink-500 animate-pulse flex items-center justify-center relative cursor-pointer shadow-2xl transition-all";
+  appendMessageBubble('user', userText, true);
+  elements.voiceStatusText.textContent = '⏳ Pensando...';
+  elements.voiceOrb.className = 'w-48 h-48 sm:w-56 sm:h-56 rounded-full bg-gradient-to-tr from-indigo-500 via-sky-500 to-pink-500 animate-pulse flex items-center justify-center relative cursor-pointer shadow-2xl transition-all';
 
   const aiResult = await fetchRealAiResponse(userText);
-
   appendMessageBubble('ai', aiResult.text, false, aiResult);
   elements.voiceTranscriptPreview.textContent = `"${aiResult.speechText || aiResult.text}"`;
 
-  // Pausa de 200ms para que Safari libere el canal de audio del micrófono antes de hablar
-  setTimeout(() => {
-    speakSpanishVoice(aiResult.speechText || aiResult.text);
-  }, 200);
+  speakSpanishVoice(aiResult.speechText || aiResult.text);
 }
 
-// --- Real AI Query Engine (Respuestas Reales y Directas) ---
+// =====================================================
+// MOTOR DE IA — Respuestas Reales y Directas
+// =====================================================
 async function fetchRealAiResponse(query) {
   const cleanQ = query.trim();
-  const lower = cleanQ.toLowerCase();
+  const lower  = cleanQ.toLowerCase();
 
-  // 1. Ecuaciones Trigonométricas y Matemáticas Reales
-  if (lower.includes('trigono') || lower.includes('seno') || lower.includes('coseno') || lower.includes('tangente') || lower.includes('ecuacion') || lower.includes('ecuación')) {
+  // Matemáticas y trigonometría
+  if (lower.includes('trigono') || lower.includes('seno') || lower.includes('coseno') ||
+      lower.includes('tangente') || lower.includes('ecuacion') || lower.includes('ecuación') ||
+      lower.includes('raiz') || lower.includes('raíz') || lower.includes('potencia')) {
     return solveTrigonometryOrMath(cleanQ);
   }
 
-  // 2. Planes de Viaje Ultra Económicos
-  if (lower.includes('viaje') || lower.includes('viajar') || lower.includes('itinerario') || lower.includes('roma') || lower.includes('parís') || lower.includes('paris') || lower.includes('londres') || lower.includes('barato') || lower.includes('economico') || lower.includes('económico')) {
+  // Viajes económicos
+  if (lower.includes('viaje') || lower.includes('viajar') || lower.includes('itinerario') ||
+      lower.includes('roma') || lower.includes('parís') || lower.includes('paris') ||
+      lower.includes('londres') || lower.includes('barato') || lower.includes('economico') ||
+      lower.includes('económico')) {
     return generateCheapTravelPlan(cleanQ);
   }
 
-  // 3. Documentos PDF
+  // PDF
   if (lower.includes('pdf') || lower.includes('descargar informe')) {
     return {
       text: `📄 **Documento Oficial Listo:**\n\n• **Título:** Informe Oficial VoiceNote AI\n• **Autor:** Hugo SP Studios\n• **Fecha:** ${new Date().toLocaleDateString()}\n\nPulsa abajo para descargarlo en PDF.`,
       pdfAction: true,
-      pdfTitle: "Informe_Oficial_Hugo_SP_Studios",
-      pdfContent: `DOCUMENTO OFICIAL\nDesarrollado por Hugo SP Studios\nFecha: ${new Date().toLocaleDateString()}\n\nInforme preparado para el usuario por VoiceNote AI.`,
-      speechText: "Te he preparado el documento oficial en PDF listo para descargar."
+      pdfTitle: 'Informe_Oficial_Hugo_SP_Studios',
+      pdfContent: `DOCUMENTO OFICIAL\nDesarrollado por Hugo SP Studios\nFecha: ${new Date().toLocaleDateString()}\n\nInforme preparado por VoiceNote AI.`,
+      speechText: 'Te he preparado el documento oficial en PDF listo para descargar.'
     };
   }
 
-  // 4. Calendario
-  if (lower.includes('cita') || lower.includes('agenda') || lower.includes('reunión') || lower.includes('calendario') || lower.includes('dentista') || lower.includes('médico')) {
-    const title = lower.includes('dentista') ? 'Cita con el Dentista' : (lower.includes('médico') ? 'Cita Médica' : 'Reunión Agendada');
+  // Calendario
+  if (lower.includes('cita') || lower.includes('agenda') || lower.includes('reunión') ||
+      lower.includes('calendario') || lower.includes('dentista') || lower.includes('médico')) {
+    const title = lower.includes('dentista') ? 'Cita con el Dentista' :
+                  lower.includes('médico')   ? 'Cita Médica' : 'Reunión Agendada';
     return {
-      text: `📅 **Cita Preparada:**\n\n• **Evento:** ${title}\n• **Recordatorio:** Notificación 30 minutos antes.\n\nPulsa abajo para añadirla a **Google Calendar** o descargar el archivo para **Apple Calendar (iPhone)**.`,
+      text: `📅 **Cita Preparada:**\n\n• **Evento:** ${title}\n• **Recordatorio:** 30 minutos antes.\n\nPulsa para añadirla a **Google Calendar** o descargar para **Apple Calendar (iPhone)**.`,
       calendarAction: true,
       calendarTitle: title,
-      speechText: `Cita lista para agendar en Google Calendar o en tu iPhone.`
+      speechText: `Cita ${title} lista para agendar en tu calendario.`
     };
   }
 
-  // 5. Generative LLM via Pollinations POST API
+  // IA Generativa — Pollinations API
   try {
-    const systemInstruction = `Eres VoiceNote AI desarrollado por Hugo SP Studios. Responde en castellano DIRECTAMENTE a lo que te pidan, con precisión matemática o datos reales. PROHIBIDO usar frases de relleno como 'lo entiendo perfectamente' o 'para responderte con precisión'. Ve directo a la solución.`;
-    
+    const systemPrompt = `Eres VoiceNote AI, un asistente creado por Hugo SP Studios. Responde SIEMPRE en castellano de España. Sé directo, claro y útil. Sin frases de relleno. Ve directo a la respuesta.`;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timer = setTimeout(() => controller.abort(), 6000);
 
     const res = await fetch('https://text.pollinations.ai/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         messages: [
-          { role: 'system', content: systemInstruction },
-          { role: 'user', content: cleanQ }
+          { role: 'system', content: systemPrompt },
+          { role: 'user',   content: cleanQ }
         ],
-        model: 'openai'
+        model: 'openai',
+        seed: 42
       }),
       signal: controller.signal
     });
 
-    clearTimeout(timeoutId);
+    clearTimeout(timer);
 
     if (res.ok) {
       const answer = await res.text();
-      if (answer && answer.trim().length > 5 && !answer.includes('Rate limit')) {
-        return {
-          text: answer.trim(),
-          speechText: answer.trim().replace(/[*_#•`$\\]/g, '').slice(0, 350)
-        };
+      if (answer && answer.trim().length > 3 && !answer.includes('Rate limit')) {
+        const speechVersion = answer.trim().replace(/[*_#•`$\\]/g, '').slice(0, 400);
+        return { text: answer.trim(), speechText: speechVersion };
       }
     }
   } catch (err) {
-    console.warn('Fallback local:', err);
+    console.warn('API fallback:', err.message);
   }
 
-  // 6. Local Direct Solver
+  // Respuesta local directa
   return getDirectKnowledgeAnswer(cleanQ);
 }
 
-// Explicación Matemática y Trigonométrica Rigurosa con KaTeX
+// Trigonometría con KaTeX
 function solveTrigonometryOrMath(query) {
   return {
-    text: `📐 **Resolución de la Ecuación Trigonométrica:**
+    text: `📐 **Resolución Trigonométrica:**
 
 $$2\\sin(x) - 1 = 0$$
 
----
+### Paso 1: Despejar el seno
+$$\\sin(x) = \\frac{1}{2}$$
 
-### Paso 1: Despejar la función seno
-Sumamos $1$ y dividimos entre $2$:
-$$2\\sin(x) = 1 \\implies \\sin(x) = \\frac{1}{2}$$
+### Paso 2: Ángulos en $[0°, 360°)$
+1. **Cuadrante I:** $x_1 = 30° = \\frac{\\pi}{6}$ rad
+2. **Cuadrante II:** $x_2 = 150° = \\frac{5\\pi}{6}$ rad
 
----
+### Paso 3: Solución general
+$$x = \\frac{\\pi}{6} + 2k\\pi \\quad \\text{o} \\quad x = \\frac{5\\pi}{6} + 2k\\pi, \\quad k \\in \\mathbb{Z}$$
 
-### Paso 2: Hallar los ángulos notables en la circunferencia ($0^\\circ \\le x < 360^\\circ$)
-Buscamos en qué cuadrantes el seno es positivo: en el **primer cuadrante ($I$)** y en el **segundo cuadrante ($II$)**:
-
-1. **Primer Cuadrante:**
-   $$x_1 = 30^\\circ = \\frac{\\pi}{6} \\text{ rad}$$
-
-2. **Segundo Cuadrante:**
-   $$x_2 = 180^\\circ - 30^\\circ = 150^\\circ = \\frac{5\\pi}{6} \\text{ rad}$$
-
----
-
-### Paso 3: Solución General (todas las vueltas $k \\in \\mathbb{Z}$)
-$$x_1 = \\frac{\\pi}{6} + 2k\\pi, \\quad k \\in \\mathbb{Z}$$
-$$x_2 = \\frac{5\\pi}{6} + 2k\\pi, \\quad k \\in \\mathbb{Z}$$
-
-💡 **Identidad Fundamental:** $\\sin^2(x) + \\cos^2(x) = 1$.`,
-    speechText: "Para resolver dos seno de equis menos uno igual a cero, despejamos el seno sumando uno y dividiendo entre dos, obteniendo seno de equis igual a un medio. En el primer cuadrante el ángulo es treinta grados, que es pi sobre seis radianes. En el segundo cuadrante es ciento cincuenta grados, que es cinco pi sobre seis radianes. Para todas las vueltas se añade más dos k pi."
+💡 **Identidad:** $\\sin^2(x) + \\cos^2(x) = 1$`,
+    speechText: 'La ecuación dos seno de equis menos uno igual a cero se resuelve despejando el seno, que da un medio. Los ángulos solución son treinta grados y ciento cincuenta grados, más múltiplos de trescientos sesenta.'
   };
 }
 
-// Plan de Viaje Ultra Económico
+// Plan de viaje económico
 function generateCheapTravelPlan(query) {
-  const city = query.toLowerCase().includes('roma') ? 'Roma' : (query.toLowerCase().includes('parís') || query.toLowerCase().includes('paris') ? 'París' : 'tu destino');
+  const city = query.toLowerCase().includes('roma') ? 'Roma' :
+               (query.toLowerCase().includes('parís') || query.toLowerCase().includes('paris')) ? 'París' :
+               query.toLowerCase().includes('londres') ? 'Londres' : 'tu destino';
 
   return {
-    text: `✈️ **Plan de Viaje Ultra Económico a ${city} (3 Días):**
+    text: `✈️ **Plan Ultra Económico a ${city} — 3 Días:**
 
-### 1. Vuelos y Transporte (35€ - 55€)
-• Vuelos: Reserva en Google Flights en modo incógnito viajando martes o miércoles con equipaje de mano en Ryanair o Wizz Air.
-• Transporte local: Compra el abono de transporte público de 72 horas (18€) o muévete caminando.
+### 1. Vuelos (35€ – 55€)
+• Ryanair o Wizz Air, martes o miércoles, solo equipaje de mano.
+• Busca en Google Flights en modo incógnito.
 
-### 2. Alojamiento Barato (20€ - 25€ / noche)
-• Reserva en albergues valorados con +8 en **Hostelworld** (ej: The YellowSquare o Generator) o en habitaciones compartidas cerca del metro.
+### 2. Alojamiento (20€ – 25€/noche)
+• Albergues con nota +8 en Hostelworld (ej. The YellowSquare, Generator).
 
-### 3. Comida Barata y Rica (12€ - 15€ / día)
-• Desayuno: Café y bollo en panaderías locales en barra (2,50€).
-• Almuerzo: Pizza al corte al peso o panini tradicional (4€ - 5€).
-• Cena: Compra en supermercados locales o menús de día económicos.
+### 3. Comida (12€ – 15€/día)
+• Desayuno: café y bollo en barra (2,50€).
+• Almuerzo: pizza al corte o panini (4€).
+• Cena: supermercado local.
 
-💰 **Presupuesto total estimado para los 3 días:** **140€ - 165€** todo incluido.`,
-    speechText: `Para viajar a ${city} de la forma más barata, viaja un martes o miércoles con equipaje de mano en aerolíneas low cost, alójate en un albergue por veinte euros la noche y come pizza al corte y productos de supermercado por quince euros al día. El viaje completo de tres días te sale por unos ciento cincuenta euros.`
+💰 **Total 3 días: 140€ – 165€ todo incluido.**`,
+    speechText: `Para ${city} lo más barato: vuela martes o miércoles con equipaje de mano en Ryanair, alójate en un albergue por unos veinte euros la noche, y come pizza al corte y compra en el supermercado. Total tres días: unos ciento cincuenta euros.`
   };
 }
 
-// Respuestas Directas Locales
+// Conocimiento directo local
 function getDirectKnowledgeAnswer(query) {
   const q = query.toLowerCase().trim();
 
-  // Ciencia
-  if (q.includes('cielo es azul') || q.includes('cielo azul')) {
+  if (q.includes('cielo') && q.includes('azul')) {
     return {
-      text: `El cielo se ve azul debido a la **dispersión de Rayleigh**:\n\n• La luz del Sol contiene todos los colores del espectro combinados.\n• Al entrar en la atmósfera, choca contra las moléculas de nitrógeno y oxígeno.\n• La luz azul viaja en ondas cortas y se dispersa en todas direcciones unas 10 veces más que la luz roja.\n• Por eso vemos la cúpula celeste de color azul durante el día.`,
-      speechText: "El cielo se ve azul debido a la dispersión de Rayleigh: la luz del sol choca contra las moléculas de nitrógeno y oxígeno de la atmósfera, y como la luz azul viaja en ondas más cortas, se dispersa en todas direcciones diez veces más que la luz roja."
+      text: '**El cielo es azul** por la dispersión de Rayleigh: la luz solar choca con moléculas de nitrógeno y oxígeno, y la luz azul (onda corta) se dispersa 10 veces más que la roja en todas direcciones.',
+      speechText: 'El cielo es azul porque la luz del sol choca con las moléculas del aire y la luz azul, al tener onda más corta, se dispersa en todas direcciones diez veces más que la luz roja.'
     };
   }
 
-  // Aritmética
-  const mathMatch = q.match(/(\d+)\s*(\+|\-|\*|\/|x|por|entre|mas|menos)\s*(\d+)/i);
+  // Aritmética básica
+  const mathMatch = q.match(/(\d+[\.,]?\d*)\s*(\+|\-|\*|\/|x|por|entre|mas|menos|dividido)\s*(\d+[\.,]?\d*)/i);
   if (mathMatch) {
-    const n1 = parseFloat(mathMatch[1]);
+    const n1 = parseFloat(mathMatch[1].replace(',', '.'));
     const op = mathMatch[2].toLowerCase();
-    const n2 = parseFloat(mathMatch[3]);
-    let r = 0;
-    if (op === '+' || op === 'mas') r = n1 + n2;
-    else if (op === '-' || op === 'menos') r = n1 - n2;
-    else if (op === '*' || op === 'x' || op === 'por') r = n1 * n2;
-    else if (op === '/' || op === 'entre') r = n2 !== 0 ? (n1 / n2) : 'Indeterminado';
-
+    const n2 = parseFloat(mathMatch[3].replace(',', '.'));
+    let r;
+    if (op === '+' || op === 'mas')                         r = n1 + n2;
+    else if (op === '-' || op === 'menos')                  r = n1 - n2;
+    else if (op === '*' || op === 'x' || op === 'por')      r = n1 * n2;
+    else if (op === '/' || op === 'entre' || op === 'dividido') r = n2 !== 0 ? +(n1 / n2).toFixed(4) : 'Indefinido';
     return {
-      text: `Resultado: **${n1} ${op} ${n2} = ${r}**`,
-      speechText: `El resultado es ${r}.`
+      text: `**${n1} ${op} ${n2} = ${r}**`,
+      speechText: `El resultado de ${n1} ${op} ${n2} es ${r}.`
     };
   }
 
   // Capitales
   if (q.includes('capital de')) {
-    const capitals = {
-      'españa': 'Madrid', 'francia': 'París', 'portugal': 'Lisboa', 'italia': 'Roma',
-      'alemania': 'Berlín', 'reino unido': 'Londres', 'méxico': 'Ciudad de México',
-      'mexico': 'Ciudad de México', 'argentina': 'Buenos Aires', 'colombia': 'Bogotá',
-      'estados unidos': 'Washington D.C.', 'japón': 'Tokio', 'japon': 'Tokio', 'china': 'Pekín'
+    const caps = {
+      'españa':'Madrid','francia':'París','portugal':'Lisboa','italia':'Roma',
+      'alemania':'Berlín','reino unido':'Londres','estados unidos':'Washington D.C.',
+      'méxico':'Ciudad de México','mexico':'Ciudad de México','argentina':'Buenos Aires',
+      'china':'Pekín','japón':'Tokio','japon':'Tokio','colombia':'Bogotá'
     };
-    for (const [country, cap] of Object.entries(capitals)) {
+    for (const [country, cap] of Object.entries(caps)) {
       if (q.includes(country)) {
         return {
-          text: `La capital de **${country.charAt(0).toUpperCase() + country.slice(1)}** es **${cap}**.`,
+          text: `La capital de **${country.charAt(0).toUpperCase()+country.slice(1)}** es **${cap}**.`,
           speechText: `La capital de ${country} es ${cap}.`
         };
       }
@@ -482,18 +477,20 @@ function getDirectKnowledgeAnswer(query) {
   // Saludos
   if (q.includes('hola') || q.includes('buenas') || q.includes('qué tal') || q.includes('que tal')) {
     return {
-      text: `¡Hola! ¿Qué necesitas resolver hoy? Pregúntame sobre matemáticas, viajes, ciencia o pídeme lo que quieras.`,
-      speechText: "¡Hola! ¿Qué necesitas resolver hoy? Estoy listo para responderte con mi voz en castellano."
+      text: '¡Hola! ¿En qué puedo ayudarte? Pregúntame lo que quieras: matemáticas, viajes, ciencia, o lo que necesites.',
+      speechText: '¡Hola! Estoy aquí para ayudarte. ¿Qué necesitas?'
     };
   }
 
   return {
-    text: `Aquí tienes la solución directa sobre **${escapeHtml(query)}**:\n\n• **Explicación:** Aborda la cuestión analizando los datos principales y aplicando la fórmula o paso correspondiente.\n• **Opciones:** Puedo redactarte un documento en **PDF** si lo necesitas.`,
-    speechText: `Sobre tu consulta, aquí tienes los pasos y datos directos. Dime si quieres profundizar en algo más.`
+    text: `Sobre **"${escapeHtml(query)}"**: te puedo dar una explicación detallada, resolver cálculos, hacer un plan de viaje o prepararte un PDF. ¿Qué prefieres?`,
+    speechText: `Dime más sobre lo que necesitas y te ayudo con ello.`
   };
 }
 
-// --- Submit Message from Chat Form ---
+// =====================================================
+// CHAT — Envío de mensajes escritos
+// =====================================================
 async function handleUserSubmit(text, fromVoice = false) {
   if (!text.trim()) return;
   if (elements.welcomeScreen) elements.welcomeScreen.remove();
@@ -506,8 +503,6 @@ async function handleUserSubmit(text, fromVoice = false) {
 
   const aiOutput = await fetchRealAiResponse(text);
   replaceThinkingBubble(thinkId, aiOutput);
-
-  // Reproducir voz en castellano
   speakSpanishVoice(aiOutput.speechText || aiOutput.text);
 }
 
@@ -519,7 +514,7 @@ function appendMessageBubble(sender, text, isVoice = false) {
     div.innerHTML = `
       <div class="max-w-[85%] sm:max-w-md p-3.5 rounded-2xl rounded-tr-sm bg-gradient-to-r from-sky-600 to-blue-600 text-white shadow-lg text-xs sm:text-sm">
         <p class="whitespace-pre-wrap leading-relaxed">${escapeHtml(text)}</p>
-        ${isVoice ? '<div class="flex items-center justify-end gap-1 text-[10px] text-sky-200 mt-1"><i data-lucide="mic" class="w-3 h-3"></i> Mensaje por voz</div>' : ''}
+        ${isVoice ? '<div class="flex items-center justify-end gap-1 text-[10px] text-sky-200 mt-1"><i data-lucide="mic" class="w-3 h-3"></i> Por voz</div>' : ''}
       </div>
     `;
   }
@@ -538,7 +533,7 @@ function appendThinkingBubble(id) {
     </div>
     <div class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 text-xs text-slate-400 flex items-center gap-2">
       <span class="w-2 h-2 rounded-full bg-sky-400 animate-ping"></span>
-      <span>Calculando respuesta...</span>
+      <span>Pensando...</span>
     </div>
   `;
   elements.chatMessages.appendChild(div);
@@ -553,27 +548,25 @@ function replaceThinkingBubble(id, aiOutput) {
   const div = document.createElement('div');
   div.className = 'flex items-start gap-3 my-3';
 
-  let actionButtonsHtml = '';
-
+  let actionBtns = '';
   if (aiOutput.pdfAction) {
-    actionButtonsHtml += `
-      <div class="mt-3 pt-3 border-t border-slate-800 flex items-center gap-2">
-        <button data-download-pdf="${encodeURIComponent(aiOutput.pdfTitle || 'Documento')}" data-content="${encodeURIComponent(aiOutput.pdfContent || aiOutput.text)}" class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md transition-colors">
-          <i data-lucide="download" class="w-3.5 h-3.5"></i> Descargar PDF Oficial
+    actionBtns += `
+      <div class="mt-3 pt-3 border-t border-slate-800">
+        <button data-download-pdf="${encodeURIComponent(aiOutput.pdfTitle||'Documento')}" data-content="${encodeURIComponent(aiOutput.pdfContent||aiOutput.text)}" class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md transition-colors">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i> Descargar PDF
         </button>
       </div>
     `;
   }
-
   if (aiOutput.calendarAction) {
-    const googleCalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(aiOutput.calendarTitle)}`;
-    actionButtonsHtml += `
-      <div class="mt-3 pt-3 border-t border-slate-800 flex items-center gap-2 flex-wrap">
-        <a href="${googleCalUrl}" target="_blank" class="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md transition-colors">
-          <i data-lucide="calendar" class="w-3.5 h-3.5"></i> Añadir a Google Calendar
+    const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(aiOutput.calendarTitle)}`;
+    actionBtns += `
+      <div class="mt-3 pt-3 border-t border-slate-800 flex gap-2 flex-wrap">
+        <a href="${googleUrl}" target="_blank" class="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md transition-colors">
+          <i data-lucide="calendar" class="w-3.5 h-3.5"></i> Google Calendar
         </a>
-        <button data-download-ics="${encodeURIComponent(aiOutput.calendarTitle)}" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium flex items-center gap-1.5 transition-colors">
-          <i data-lucide="smartphone" class="w-3.5 h-3.5"></i> Apple Calendar (.ICS)
+        <button data-download-ics="${encodeURIComponent(aiOutput.calendarTitle)}" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center gap-1.5 transition-colors">
+          <i data-lucide="smartphone" class="w-3.5 h-3.5"></i> Apple Calendar (.ics)
         </button>
       </div>
     `;
@@ -586,11 +579,11 @@ function replaceThinkingBubble(id, aiOutput) {
     <div class="flex-1 max-w-[88%] sm:max-w-xl">
       <div class="math-content p-4 rounded-2xl rounded-tl-sm bg-slate-900 border border-slate-800 text-slate-200 shadow-md text-xs sm:text-sm leading-relaxed select-text">
         ${formatMarkdown(aiOutput.text)}
-        ${actionButtonsHtml}
+        ${actionBtns}
       </div>
       <div class="flex items-center gap-3 mt-1.5 px-1 text-[11px] text-slate-500">
-        <button data-speak-msg="${encodeURIComponent(aiOutput.speechText || aiOutput.text)}" class="hover:text-sky-400 transition-colors flex items-center gap-1 text-sky-400 font-medium">
-          <i data-lucide="volume-2" class="w-3.5 h-3.5"></i> Reproducir voz de nuevo
+        <button data-speak-msg="${encodeURIComponent(aiOutput.speechText||aiOutput.text)}" class="hover:text-sky-400 transition-colors flex items-center gap-1 text-sky-400 font-medium">
+          <i data-lucide="volume-2" class="w-3.5 h-3.5"></i> Reproducir
         </button>
         <span>•</span>
         <button data-copy-msg="${encodeURIComponent(aiOutput.text)}" class="hover:text-slate-300 transition-colors flex items-center gap-1">
@@ -602,45 +595,29 @@ function replaceThinkingBubble(id, aiOutput) {
 
   el.replaceWith(div);
   refreshIcons();
-
   renderMathFormulas(div.querySelector('.math-content'));
 
-  const speakBtn = div.querySelector('[data-speak-msg]');
-  if (speakBtn) {
-    speakBtn.addEventListener('click', () => {
-      speakSpanishVoice(decodeURIComponent(speakBtn.getAttribute('data-speak-msg')));
-    });
-  }
+  // Eventos de botones
+  div.querySelector('[data-speak-msg]')?.addEventListener('click', (e) => {
+    speakSpanishVoice(decodeURIComponent(e.currentTarget.dataset.speakMsg));
+  });
 
-  const copyBtn = div.querySelector('[data-copy-msg]');
-  if (copyBtn) {
-    copyBtn.addEventListener('click', () => {
-      navigator.clipboard.writeText(decodeURIComponent(copyBtn.getAttribute('data-copy-msg')));
-      copyBtn.innerHTML = '<i data-lucide="check" class="w-3 h-3 text-emerald-400"></i> Copiado';
-      refreshIcons();
-      setTimeout(() => {
-        copyBtn.innerHTML = '<i data-lucide="copy" class="w-3 h-3"></i> Copiar';
-        refreshIcons();
-      }, 2000);
-    });
-  }
+  div.querySelector('[data-copy-msg]')?.addEventListener('click', (e) => {
+    navigator.clipboard.writeText(decodeURIComponent(e.currentTarget.dataset.copyMsg));
+    e.currentTarget.textContent = '✓ Copiado';
+    setTimeout(() => { e.currentTarget.innerHTML = '<i data-lucide="copy" class="w-3 h-3"></i> Copiar'; refreshIcons(); }, 2000);
+  });
 
-  const pdfBtn = div.querySelector('[data-download-pdf]');
-  if (pdfBtn) {
-    pdfBtn.addEventListener('click', () => {
-      const title = decodeURIComponent(pdfBtn.getAttribute('data-download-pdf'));
-      const content = decodeURIComponent(pdfBtn.getAttribute('data-content'));
-      generatePdfDocument(title, content);
-    });
-  }
+  div.querySelector('[data-download-pdf]')?.addEventListener('click', (e) => {
+    generatePdfDocument(
+      decodeURIComponent(e.currentTarget.dataset.downloadPdf),
+      decodeURIComponent(e.currentTarget.dataset.content)
+    );
+  });
 
-  const icsBtn = div.querySelector('[data-download-ics]');
-  if (icsBtn) {
-    icsBtn.addEventListener('click', () => {
-      const title = decodeURIComponent(icsBtn.getAttribute('data-download-ics'));
-      downloadIcsCalendarFile(title);
-    });
-  }
+  div.querySelector('[data-download-ics]')?.addEventListener('click', (e) => {
+    downloadIcsCalendarFile(decodeURIComponent(e.currentTarget.dataset.downloadIcs));
+  });
 
   elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
 }
@@ -649,129 +626,123 @@ function replaceThinkingBubble(id, aiOutput) {
 function generatePdfDocument(title, text) {
   try {
     const { jsPDF } = window.jspdf || {};
-    if (!jsPDF) {
-      alert('Descargando documento...');
-      return;
-    }
+    if (!jsPDF) { alert('PDF no disponible'); return; }
     const doc = new jsPDF();
-    doc.setFont("helvetica", "bold");
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(18);
     doc.setTextColor(2, 132, 199);
     doc.text(title, 20, 25);
-
-    doc.setFont("helvetica", "normal");
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
     doc.setTextColor(100, 116, 139);
     doc.text(`VoiceNote AI • Hugo SP Studios • ${new Date().toLocaleString()}`, 20, 33);
-
     doc.setDrawColor(226, 232, 240);
     doc.line(20, 37, 190, 37);
-
     doc.setFontSize(11);
     doc.setTextColor(30, 41, 59);
-
-    const splitText = doc.splitTextToSize(text, 170);
-    doc.text(splitText, 20, 48);
-
-    doc.save(`${title.replace(/\s+/g, '_')}.pdf`);
-  } catch (err) {
-    console.error(err);
-  }
+    doc.text(doc.splitTextToSize(text, 170), 20, 48);
+    doc.save(`${title.replace(/\s+/g,'_')}.pdf`);
+  } catch (err) { console.error(err); }
 }
 
 // --- Apple Calendar (.ICS) Generator ---
 function downloadIcsCalendarFile(title) {
-  const now = new Date();
-  const startTime = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString().replace(/-|:|\.\d\d\d/g, "");
-  const endTime = new Date(now.getTime() + 25 * 60 * 60 * 1000).toISOString().replace(/-|:|\.\d\d\d/g, "");
-
-  const ics = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//Hugo SP Studios//VoiceNote AI//ES",
-    "BEGIN:VEVENT",
+  const now   = new Date();
+  const start = new Date(now.getTime() + 86400000).toISOString().replace(/[-:]|\.\d{3}/g, '');
+  const end   = new Date(now.getTime() + 90000000).toISOString().replace(/[-:]|\.\d{3}/g, '');
+  const ics   = [
+    'BEGIN:VCALENDAR','VERSION:2.0',
+    'PRODID:-//Hugo SP Studios//VoiceNote AI//ES',
+    'BEGIN:VEVENT',
     `SUMMARY:${title}`,
     `DESCRIPTION:Agendado desde VoiceNote AI de Hugo SP Studios`,
-    `DTSTART:${startTime}`,
-    `DTEND:${endTime}`,
-    "STATUS:CONFIRMED",
-    "END:VEVENT",
-    "END:VCALENDAR"
-  ].join("\r\n");
-
-  const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
-  const a = document.createElement("a");
-  a.href = window.URL.createObjectURL(blob);
-  a.setAttribute("download", `${title.replace(/\s+/g, '_')}.ics`);
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+    `DTSTART:${start}`,`DTEND:${end}`,
+    'STATUS:CONFIRMED','END:VEVENT','END:VCALENDAR'
+  ].join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
+  a.download = `${title.replace(/\s+/g,'_')}.ics`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 
 function formatMarkdown(text) {
   return escapeHtml(text)
     .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
     .replace(/^### (.*$)/gim, '<h3 class="text-sm font-bold text-sky-300 mt-2.5 mb-1">$1</h3>')
-    .replace(/^• (.*$)/gim, '<li class="ml-3 list-disc text-slate-300">$1</li>');
+    .replace(/^• (.*$)/gim, '<li class="ml-3 list-disc text-slate-300">$1</li>')
+    .replace(/\n/g, '<br>');
 }
 
 function escapeHtml(text) {
-  return (text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return (text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// --- Event Listeners ---
+// =====================================================
+// EVENT LISTENERS
+// =====================================================
+
+// Enviar mensaje escrito
 elements.chatForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const text = elements.chatInput.value.trim();
   if (text) handleUserSubmit(text, false);
 });
 
-// Single tap mic for text dictation
+// Micrófono de dictado (texto)
 elements.micBtn.addEventListener('click', () => {
   if (state.isRecording) {
     stopSpeechRecognizer();
   } else {
-    elements.micBtn.classList.remove('bg-slate-800', 'text-slate-300');
-    elements.micBtn.classList.add('bg-red-500', 'text-white', 'animate-pulse');
-    elements.micIcon.setAttribute('data-lucide', 'square');
+    elements.micBtn.classList.remove('bg-slate-800','text-slate-300');
+    elements.micBtn.classList.add('bg-red-500','text-white','animate-pulse');
+    elements.micIcon.setAttribute('data-lucide','square');
     refreshIcons();
     startSpeechRecognizer();
   }
 });
 
-// Botón MODO VOZ (Al lado de Enviar)
+// Botón MODO VOZ (al lado de enviar)
+// touchend con preventDefault evita el click doble en móvil
 if (elements.openLiveVoiceBtn) {
-  elements.openLiveVoiceBtn.addEventListener('click', openLiveVoiceModal);
-  elements.openLiveVoiceBtn.addEventListener('touchend', openLiveVoiceModal);
-}
-
-if (elements.closeLiveVoiceBtn) {
-  elements.closeLiveVoiceBtn.addEventListener('click', closeLiveVoiceModal);
-  elements.closeLiveVoiceBtn.addEventListener('touchend', closeLiveVoiceModal);
-}
-
-if (elements.manualSpeakBtn) {
-  elements.manualSpeakBtn.addEventListener('click', () => {
-    if (state.lastAiSpeechText) {
-      speakSpanishVoice(state.lastAiSpeechText);
-    }
+  elements.openLiveVoiceBtn.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    openLiveVoiceModal(e);
+  });
+  elements.openLiveVoiceBtn.addEventListener('click', (e) => {
+    // Solo se ejecuta en desktop (en móvil ya lo disparó touchend)
+    if (e.pointerType !== 'touch') openLiveVoiceModal(e);
   });
 }
 
+// Cerrar modal de voz
+if (elements.closeLiveVoiceBtn) {
+  elements.closeLiveVoiceBtn.addEventListener('touchend', (e) => { e.preventDefault(); closeLiveVoiceModal(e); });
+  elements.closeLiveVoiceBtn.addEventListener('click',    (e) => { if (e.pointerType !== 'touch') closeLiveVoiceModal(e); });
+}
+
+// Botón repetir última respuesta en voz
+if (elements.manualSpeakBtn) {
+  elements.manualSpeakBtn.addEventListener('click', () => {
+    if (state.lastAiSpeechText) speakSpanishVoice(state.lastAiSpeechText);
+  });
+}
+
+// Micrófono dentro del modal de voz
 elements.toggleVoiceCallMicBtn.addEventListener('click', () => {
   if (state.isRecording) {
     stopSpeechRecognizer();
-    elements.callMicIcon.classList.replace('text-sky-400', 'text-red-400');
+    elements.callMicIcon.setAttribute('data-lucide','mic-off');
   } else {
     startSpeechRecognizer();
-    elements.callMicIcon.classList.replace('text-red-400', 'text-sky-400');
+    elements.callMicIcon.setAttribute('data-lucide','mic');
   }
+  refreshIcons();
 });
 
-elements.clearChatBtn.addEventListener('click', () => {
-  location.reload();
-});
+// Nueva conversación
+elements.clearChatBtn.addEventListener('click', () => location.reload());
 
+// Inicialización
 window.addEventListener('DOMContentLoaded', () => {
   initVoices();
   refreshIcons();
