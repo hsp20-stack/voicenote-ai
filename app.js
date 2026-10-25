@@ -87,8 +87,27 @@ function getBestSpanishVoice() {
   return preferred || voices.find(v => v.lang.toLowerCase().startsWith('es')) || null;
 }
 
+// Voz masculina en español — usada SOLO en el Orbe (botón al lado de Enviar)
+function getMaleSpanishVoice() {
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+
+  const maleNames = ['Jorge', 'Diego', 'Carlos', 'Pablo', 'Miguel', 'Juan',
+                     'Javier', 'Antonio', 'Enrique', 'Rodrigo', 'Luciano'];
+
+  // Buscar voz masculina por nombre
+  const maleVoice = voices.find(v =>
+    v.lang.toLowerCase().startsWith('es') &&
+    maleNames.some(name => v.name.includes(name))
+  );
+
+  // Fallback: cualquier voz en español
+  return maleVoice || voices.find(v => v.lang.toLowerCase().startsWith('es')) || null;
+}
+
 // 3. Función principal de habla — SIEMPRE llamar en gesto directo del usuario
-function speakSpanishVoice(text, onEndCallback = null) {
+// useMaleVoice = true → voz masculina (Orbe); false → voz por defecto (chat)
+function speakSpanishVoice(text, onEndCallback = null, useMaleVoice = false) {
   if (!('speechSynthesis' in window) || !text) {
     if (onEndCallback) onEndCallback();
     return;
