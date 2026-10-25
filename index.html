@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>VoiceNote AI - Tu Amigo y Asistente Universal</title>
-  <meta name="description" content="IA conversacional por voz y texto con personalidad humana de amigo. Habla en 4 idiomas, genera PDFs y agenda citas. Desarrollada por Hugo SP Studios.">
+  <meta name="description" content="IA conversacional por voz y texto con respuestas directas y reales. Desarrollada por Hugo SP Studios.">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0284c7">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -86,6 +86,12 @@
   <div class="border-b border-sky-950/60 bg-[#080d1d]/60 py-2 px-4 overflow-x-auto">
     <div class="max-w-4xl mx-auto flex items-center gap-2 text-xs">
       <span class="text-slate-400 text-[11px] font-semibold uppercase tracking-wider hidden sm:inline">Herramientas:</span>
+      <button data-quick-action="trig" class="tool-btn px-2.5 py-1 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5 flex-shrink-0 transition-colors">
+        <i data-lucide="calculator" class="w-3.5 h-3.5 text-indigo-400"></i> Trigonometría
+      </button>
+      <button data-quick-action="travel" class="tool-btn px-2.5 py-1 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5 flex-shrink-0 transition-colors">
+        <i data-lucide="plane" class="w-3.5 h-3.5 text-emerald-400"></i> Viaje Económico
+      </button>
       <button data-quick-action="pdf" class="tool-btn px-2.5 py-1 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5 flex-shrink-0 transition-colors">
         <i data-lucide="file-down" class="w-3.5 h-3.5 text-rose-400"></i> Crear PDF
       </button>
@@ -94,9 +100,6 @@
       </button>
       <button data-quick-action="calendar" class="tool-btn px-2.5 py-1 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5 flex-shrink-0 transition-colors">
         <i data-lucide="calendar" class="w-3.5 h-3.5 text-amber-400"></i> Agendar Cita
-      </button>
-      <button data-quick-action="recommend" class="tool-btn px-2.5 py-1 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5 flex-shrink-0 transition-colors">
-        <i data-lucide="sparkles" class="w-3.5 h-3.5 text-sky-400"></i> Consejos de Amigo
       </button>
     </div>
   </div>
@@ -108,48 +111,48 @@
     <div id="chatMessages" class="flex-1 space-y-4 overflow-y-auto pb-4">
       
       <!-- Portada de Bienvenida -->
-      <div id="welcomeScreen" class="text-center py-10 sm:py-14 space-y-4">
+      <div id="welcomeScreen" class="text-center py-8 sm:py-12 space-y-4">
         <div class="w-16 h-16 mx-auto rounded-3xl bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center shadow-2xl shadow-sky-500/30 ring-4 ring-sky-500/20">
           <i data-lucide="bot" class="w-8 h-8 text-white"></i>
         </div>
         <div>
-          <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">¡Hola, amigo! ¿Qué hay de nuevo?</h1>
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">¡Hola! ¿En qué nos ponemos hoy?</h1>
           <p class="text-xs sm:text-sm text-slate-400 max-w-md mx-auto mt-1">
-            Soy VoiceNote AI. Puedes hablar conmigo de lo que quieras como con un colega, pedirme consejos, crear un PDF o agendar citas.
+            Respuestas directas y exactas. Resuelvo problemas de matemáticas y trigonometría, planifico viajes baratos, redacto documentos en PDF o charlo contigo por voz.
           </p>
         </div>
 
         <!-- Tarjetas de Sugerencias -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-lg mx-auto pt-4 text-left">
-          <button data-prompt="¿Qué tal, amigo? Cuéntame algo curioso que me alegre el día" class="prompt-card p-3 rounded-2xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 text-xs text-slate-300 hover:text-white transition-all flex items-start gap-2.5">
-            <span class="text-lg">👋</span>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-lg mx-auto pt-2 text-left">
+          <button data-prompt="Resuélveme una ecuación trigonométrica paso a paso y explícame cómo se hace" class="prompt-card p-3 rounded-2xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 text-xs text-slate-300 hover:text-white transition-all flex items-start gap-2.5">
+            <span class="text-lg">📐</span>
             <div>
-              <strong class="block text-slate-200">Charlar un rato</strong>
-              <span class="text-[11px] text-slate-500">Conversación amigable y cercana</span>
+              <strong class="block text-slate-200">Ecuación Trigonométrica</strong>
+              <span class="text-[11px] text-slate-500">Resolución paso a paso y fórmulas</span>
             </div>
           </button>
 
-          <button data-prompt="Recomiéndame 3 películas buenísimas para ver este fin de semana con palomitas" class="prompt-card p-3 rounded-2xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 text-xs text-slate-300 hover:text-white transition-all flex items-start gap-2.5">
-            <span class="text-lg">🍿</span>
+          <button data-prompt="Planifícame un viaje de 3 días lo más barato posible a Roma con presupuesto detallado" class="prompt-card p-3 rounded-2xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 text-xs text-slate-300 hover:text-white transition-all flex items-start gap-2.5">
+            <span class="text-lg">✈️</span>
             <div>
-              <strong class="block text-slate-200">Recomendaciones de cine</strong>
-              <span class="text-[11px] text-slate-500">Las mejores películas recomendadas</span>
+              <strong class="block text-slate-200">Plan de Viaje Ultra Económico</strong>
+              <span class="text-[11px] text-slate-500">Vuelos baratos, hostels y comida</span>
             </div>
           </button>
 
-          <button data-prompt="Agenda una cita de dentista para el próximo lunes a las 11:30" class="prompt-card p-3 rounded-2xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 text-xs text-slate-300 hover:text-white transition-all flex items-start gap-2.5">
+          <button data-prompt="¿Por qué el cielo es azul y qué es la dispersión de Rayleigh?" class="prompt-card p-3 rounded-2xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 text-xs text-slate-300 hover:text-white transition-all flex items-start gap-2.5">
+            <span class="text-lg">🌍</span>
+            <div>
+              <strong class="block text-slate-200">Ciencia y Naturaleza</strong>
+              <span class="text-[11px] text-slate-500">Explicaciones claras y directas</span>
+            </div>
+          </button>
+
+          <button data-prompt="Agenda una cita con el dentista para el próximo viernes a las 11:30" class="prompt-card p-3 rounded-2xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 text-xs text-slate-300 hover:text-white transition-all flex items-start gap-2.5">
             <span class="text-lg">📅</span>
             <div>
-              <strong class="block text-slate-200">Agendar cita</strong>
+              <strong class="block text-slate-200">Agendar en mi Calendario</strong>
               <span class="text-[11px] text-slate-500">Google Calendar o Apple Calendar</span>
-            </div>
-          </button>
-
-          <button data-prompt="Redacta un informe ejecutivo sobre productividad y prepáralo en PDF" class="prompt-card p-3 rounded-2xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 text-xs text-slate-300 hover:text-white transition-all flex items-start gap-2.5">
-            <span class="text-lg">📄</span>
-            <div>
-              <strong class="block text-slate-200">Generar PDF Oficial</strong>
-              <span class="text-[11px] text-slate-500">Descarga directa en 1 clic</span>
             </div>
           </button>
         </div>
@@ -157,7 +160,7 @@
 
     </div>
 
-    <!-- Barra de Entrada Inferior (CON MODO VOZ AL LADO DE ENVIAR) -->
+    <!-- Barra de Entrada Inferior (CON BOTÓN DE VOZ COMPACTO AL LADO DE ENVIAR) -->
     <div class="sticky bottom-0 pt-2 pb-1 bg-[#0b1329]/95 backdrop-blur-md">
       <form id="chatForm" class="relative flex items-center gap-1.5 bg-slate-900/90 border border-slate-800 focus-within:border-sky-500/80 rounded-2xl p-1.5 shadow-xl transition-all">
         
@@ -167,18 +170,17 @@
         </button>
 
         <!-- Campo de Texto -->
-        <input type="text" id="chatInput" placeholder="Escribe o habla conmigo..." autocomplete="off" class="flex-1 bg-transparent px-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none">
+        <input type="text" id="chatInput" placeholder="Haz una pregunta, pide un cálculo o viaje..." autocomplete="off" class="flex-1 bg-transparent px-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none">
 
         <!-- Botón Enviar Mensaje Escrito -->
         <button type="submit" id="sendBtn" class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-sky-600 text-slate-400 hover:text-white flex items-center justify-center transition-all flex-shrink-0 active:scale-95" title="Enviar mensaje">
           <i data-lucide="arrow-up" class="w-4 h-4"></i>
         </button>
 
-        <!-- BOTÓN MODO VOZ EN DIRECTO: JUSTO AL LADO DE ENVIAR -->
-        <button type="button" id="openLiveVoiceBtn" class="h-10 px-3 sm:px-3.5 rounded-xl bg-gradient-to-r from-sky-500 via-sky-600 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-sky-500/25 active:scale-95 transition-all flex-shrink-0" title="Hablar por voz en vivo como un amigo">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-          <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-          <span class="font-semibold">Modo Voz</span>
+        <!-- BOTÓN MODO VOZ: COMPACTO (w-10 h-10) Y AL LADO DE ENVIAR -->
+        <button type="button" id="openLiveVoiceBtn" onclick="openLiveVoiceModal(event)" class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 via-sky-600 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white flex items-center justify-center flex-shrink-0 shadow-lg shadow-sky-500/30 active:scale-95 transition-all relative" title="Iniciar conversación de voz con el orbe">
+          <span class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#0b1329] animate-pulse"></span>
+          <i data-lucide="sparkles" class="w-4 h-4"></i>
         </button>
       </form>
 
@@ -196,7 +198,7 @@
   <!-- ========================================== -->
   <!-- MODAL: MODO VOZ EN DIRECTO (ORBE HUMANO Y CÁLIDO) -->
   <!-- ========================================== -->
-  <div id="liveVoiceModal" class="fixed inset-0 z-50 bg-[#070d1e]/98 backdrop-blur-2xl flex flex-col justify-between items-center p-6 hidden">
+  <div id="liveVoiceModal" class="fixed inset-0 z-50 bg-[#070d1e]/98 backdrop-blur-2xl flex-col justify-between items-center p-6 hidden">
     
     <!-- Barra Superior -->
     <div class="w-full max-w-md flex items-center justify-between text-xs text-slate-400">
@@ -218,7 +220,7 @@
 
       <!-- Estado en tiempo real -->
       <p id="voiceStatusText" class="mt-8 text-base font-bold text-sky-300 tracking-wide text-center">
-        ¡Hola amigo! Te escucho, háblame...
+        ¡Hola! Te escucho, háblame...
       </p>
 
       <!-- Subtítulo en tiempo real -->
@@ -231,11 +233,11 @@
 
     <!-- Barra Inferior de Control de la Llamada -->
     <div class="w-full max-w-md flex items-center justify-center gap-6 pb-6">
-      <button id="toggleVoiceCallMicBtn" class="w-14 h-14 rounded-full bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center shadow-lg border border-slate-700 active:scale-95 transition-all">
+      <button type="button" id="toggleVoiceCallMicBtn" class="w-14 h-14 rounded-full bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center shadow-lg border border-slate-700 active:scale-95 transition-all">
         <i id="callMicIcon" data-lucide="mic" class="w-6 h-6 text-sky-400"></i>
       </button>
 
-      <button id="closeLiveVoiceBtn" class="w-14 h-14 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center shadow-xl shadow-red-600/30 active:scale-95 transition-all" title="Finalizar llamada">
+      <button type="button" id="closeLiveVoiceBtn" onclick="closeLiveVoiceModal(event)" class="w-14 h-14 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center shadow-xl shadow-red-600/30 active:scale-95 transition-all" title="Finalizar llamada">
         <i data-lucide="phone-off" class="w-6 h-6"></i>
       </button>
     </div>

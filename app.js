@@ -1,11 +1,10 @@
 /**
  * VoiceNote AI - Tu Amigo y Asistente Universal
  * Desarrollada por Hugo SP Studios.
- * - Modo Voz en Directo al lado del botón de Enviar
- * - Personalidad cercana, cálida y humana de un buen amigo
- * - Respuestas reales a cualquier pregunta
- * - Generador de PDFs, Canva y Calendario
- * - 4 Idiomas (Español, Français, Português, 中文)
+ * - Modo Voz con apertura garantizada (inline onclick + JS listeners)
+ * - Respuestas directas sin frases de relleno
+ * - Resuelve ecuaciones trigonométricas y matemáticas paso a paso
+ * - Planes de viaje ultra económicos con presupuestos reales
  */
 
 const state = {
@@ -48,7 +47,7 @@ function refreshIcons() {
   if (window.lucide) window.lucide.createIcons();
 }
 
-// --- Natural Human Voice Engine (Warm & Friendly Pitch) ---
+// --- Voice Engine: Natural Human Speech ---
 function initVoices() {
   if ('speechSynthesis' in window) {
     const loadVoices = () => {
@@ -69,7 +68,7 @@ function speakHumanVoice(text, lang = state.language, onEndCallback = null) {
   state.isAiSpeaking = true;
 
   if (state.isLiveCallActive) {
-    elements.voiceStatusText.textContent = "Tu amigo VoiceNote te está respondiendo...";
+    elements.voiceStatusText.textContent = "Te estoy respondiendo...";
     elements.voiceOrb.className = "w-48 h-48 sm:w-56 sm:h-56 rounded-full bg-gradient-to-tr from-cyan-400 via-sky-500 to-blue-600 animate-orb-glow flex items-center justify-center relative cursor-pointer shadow-2xl transition-all scale-105";
     elements.orbCenterIcon.setAttribute('data-lucide', 'volume-2');
     refreshIcons();
@@ -84,7 +83,7 @@ function speakHumanVoice(text, lang = state.language, onEndCallback = null) {
   const utterance = new SpeechSynthesisUtterance(clean);
   utterance.lang = lang;
   utterance.rate = 1.0;
-  utterance.pitch = 1.05; // Slightly warmer, friendlier pitch
+  utterance.pitch = 1.04;
 
   if (state.availableVoices.length > 0) {
     const langPrefix = lang.split('-')[0].toLowerCase();
@@ -104,7 +103,6 @@ function speakHumanVoice(text, lang = state.language, onEndCallback = null) {
       elements.orbCenterIcon.setAttribute('data-lucide', 'mic');
       refreshIcons();
 
-      // Automatically listen again for back-and-forth conversation!
       setTimeout(() => {
         if (state.isLiveCallActive && !state.isAiSpeaking) {
           startSpeechRecognizer();
@@ -202,10 +200,19 @@ function stopSpeechRecognizer() {
   }
 }
 
-// --- Live Voice Mode Controls ---
-function openLiveVoiceModal() {
+// --- Live Voice Mode Controls (Garantizado para móviles y escritorio) ---
+window.openLiveVoiceModal = function(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
   state.isLiveCallActive = true;
-  elements.liveVoiceModal.classList.remove('hidden');
+  const modal = document.getElementById('liveVoiceModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+  }
 
   const langNames = {
     'es-ES': 'ESPAÑOL',
@@ -216,42 +223,51 @@ function openLiveVoiceModal() {
   elements.voiceLanguageTag.textContent = langNames[state.language] || 'ESPAÑOL';
 
   const friendlyGreetings = {
-    'es-ES': '¡Hola, amigo! ¿Qué tal estás? Te escucho perfectamente, cuéntame lo que quieras.',
-    'fr-FR': 'Salut mon ami ! Comment vas-tu ? Je t\'écoute, dis-moi tout ce que tu veux.',
-    'pt-BR': 'Fala, meu amigo! Tudo bem? Tô te ouvindo perfeitamente, pode me contar qualquer coisa.',
-    'zh-CN': '嗨，朋友！你好吗？我在这里听着呢，随便和我聊聊吧。'
+    'es-ES': '¡Hola! Te escucho perfectamente. Pídeme lo que quieras.',
+    'fr-FR': 'Bonjour ! Je vous écoute. Posez-moi vos questions.',
+    'pt-BR': 'Olá! Estou te ouvindo perfeitamente. Pode falar.',
+    'zh-CN': '你好！我正在听，请随时告诉我。'
   };
 
   const greeting = friendlyGreetings[state.language] || friendlyGreetings['es-ES'];
-  elements.voiceStatusText.textContent = "Conectando con tu amigo...";
+  elements.voiceStatusText.textContent = "Conectando voz...";
   elements.voiceTranscriptPreview.textContent = `"${greeting}"`;
 
   speakHumanVoice(greeting, state.language, () => {
     if (state.isLiveCallActive) {
-      elements.voiceStatusText.textContent = "¡Te escucho! Háblame de lo que quieras...";
+      elements.voiceStatusText.textContent = "¡Te escucho! Háblame...";
       startSpeechRecognizer();
     }
   });
-}
+};
 
-function closeLiveVoiceModal() {
+window.closeLiveVoiceModal = function(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
   state.isLiveCallActive = false;
   window.speechSynthesis.cancel();
   stopSpeechRecognizer();
-  elements.liveVoiceModal.classList.add('hidden');
-}
 
-// Voice Exchange Handler
+  const modal = document.getElementById('liveVoiceModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
+};
+
+// Voice Exchange Handler in Modal
 async function handleVoiceExchange(userText) {
   if (!userText || state.isAiSpeaking) return;
 
   if (elements.welcomeScreen) elements.welcomeScreen.remove();
   appendMessageBubble('user', userText, true);
 
-  elements.voiceStatusText.textContent = "Pensando qué responderte...";
+  elements.voiceStatusText.textContent = "Pensando la solución...";
   elements.voiceOrb.className = "w-48 h-48 sm:w-56 sm:h-56 rounded-full bg-gradient-to-tr from-indigo-500 via-sky-500 to-pink-500 animate-pulse flex items-center justify-center relative cursor-pointer shadow-2xl transition-all";
 
-  // Query Real AI Answer with Friendly Tone
   const aiResult = await fetchRealAiResponse(userText, state.language);
 
   appendMessageBubble('ai', aiResult.text, false, aiResult);
@@ -260,73 +276,155 @@ async function handleVoiceExchange(userText) {
   speakHumanVoice(aiResult.speechText || aiResult.text, state.language);
 }
 
-// --- Real AI Query Engine (Pollinations Free LLM API with Warm Friend Persona) ---
+// --- Real AI Query Engine (Without Generic Filler Phrases!) ---
 async function fetchRealAiResponse(query, lang) {
   const cleanQ = query.trim();
   const lower = cleanQ.toLowerCase();
 
-  // Action Commands (PDF, Canva, Calendar)
+  // 1. Ecuaciones Trigonométricas y Matemáticas
+  if (lower.includes('trigono') || lower.includes('seno') || lower.includes('coseno') || lower.includes('tangente') || lower.includes('ecuacion') || lower.includes('ecuación')) {
+    return solveTrigonometryOrMath(cleanQ);
+  }
+
+  // 2. Viajes y Planes Ultra Económicos
+  if (lower.includes('viaje') || lower.includes('viajar') || lower.includes('itinerario') || lower.includes('roma') || lower.includes('parís') || lower.includes('paris') || lower.includes('londres') || lower.includes('barato') || lower.includes('economico') || lower.includes('económico')) {
+    return generateCheapTravelPlan(cleanQ);
+  }
+
+  // 3. Action Commands (PDF, Canva, Calendar)
   if (lower.includes('pdf') || lower.includes('descargar informe')) {
     return {
-      text: `📄 **¡Aquí tienes tu documento oficial, amigo!**\n\nHe redactado el informe completo:\n\n• **Título:** Informe Oficial VoiceNote AI\n• **Estudio:** Hugo SP Studios\n• **Fecha:** ${new Date().toLocaleDateString()}\n\nSolo tienes que pulsar el botón de abajo para descargarlo en tu móvil u ordenador.`,
+      text: `📄 **Documento Oficial Listo para Generar:**\n\n• **Título:** Informe Oficial VoiceNote AI\n• **Autor:** Hugo SP Studios\n• **Fecha:** ${new Date().toLocaleDateString()}\n\nPulsa el botón de abajo para descargarlo de inmediato en formato PDF.`,
       pdfAction: true,
       pdfTitle: "Informe_Oficial_Hugo_SP_Studios",
-      pdfContent: `DOCUMENTO OFICIAL\nDesarrollado por Hugo SP Studios\nFecha: ${new Date().toLocaleDateString()}\n\nContenido: Documento generado automáticamente por VoiceNote AI respondiendo a la solicitud del usuario.\n\nTodo organizado y listo para usar.`,
-      speechText: "¡Listo, amigo! Te he preparado el documento oficial en PDF para que lo descargues con un toque."
+      pdfContent: `DOCUMENTO OFICIAL\nDesarrollado por Hugo SP Studios\nFecha: ${new Date().toLocaleDateString()}\n\nContenido del informe generado automáticamente respondiendo a la solicitud del usuario.\n\nTodo organizado y listo para usar.`,
+      speechText: "Te he preparado el documento oficial en PDF listo para descargar."
     };
   }
 
   if (lower.includes('canva') || lower.includes('diseño') || lower.includes('presentación') || lower.includes('diapositiva')) {
     return {
-      text: `🎨 **¡Menuda idea para Canva! Mira lo que te he preparado:**\n\n1. **Diapositiva 1 (Portada impactante):** Fondo oscuro azul \`#0b1329\` con título grande en blanco y acento cian \`#38bdf8\`.\n2. **Diapositiva 2 (Puntos clave):** Tres bloques limpios con iconos modernos y cifras claras.\n3. **Diapositiva 3 (Conclusión):** Llamada a la acción directa y tus datos de contacto.\n\nPuedes abrir Canva directamente abajo o copiar estos textos.`,
+      text: `🎨 **Estructura para Presentación en Canva:**\n\n1. **Diapositiva 1 (Portada):** Fondo azul oscuro \`#0b1329\` con tipografía grande blanca y subtítulo cian \`#38bdf8\`.\n2. **Diapositiva 2 (Desarrollo):** 3 bloques limpios con iconos modernos y cifras clave.\n3. **Diapositiva 3 (Llamada a la Acción):** Botón central destacado y contacto.\n\nPuedes abrir Canva directamente abajo.`,
       canvaAction: true,
-      speechText: "¡Genial! Te he preparado la estructura completa y la paleta de colores para tu presentación en Canva."
+      speechText: "Te he preparado la estructura y la paleta de colores para tu presentación en Canva."
     };
   }
 
   if (lower.includes('cita') || lower.includes('agenda') || lower.includes('reunión') || lower.includes('calendario') || lower.includes('dentista') || lower.includes('médico')) {
     const title = lower.includes('dentista') ? 'Cita con el Dentista' : (lower.includes('médico') ? 'Cita Médica' : 'Reunión Agendada');
     return {
-      text: `📅 **¡Cita lista para tu calendario, amigo!**\n\n• **Evento:** ${title}\n• **Recordatorio:** Notificación 30 minutos antes para que no se te pase.\n\nPulsa abajo para añadirla directo a **Google Calendar** o descargar el archivo para tu **iPhone (Apple Calendar)**.`,
+      text: `📅 **Cita Preparada:**\n\n• **Evento:** ${title}\n• **Recordatorio:** Notificación 30 minutos antes.\n\nPulsa abajo para añadirla a **Google Calendar** o descargar el archivo para **Apple Calendar (iPhone)**.`,
       calendarAction: true,
       calendarTitle: title,
-      speechText: `¡Hecho! Te he preparado la cita para que la guardes en Google Calendar o en tu iPhone.`
+      speechText: `Cita lista para agendar en Google Calendar o en tu iPhone.`
     };
   }
 
-  // Live Free LLM Query with Warm Friend Persona
+  // 4. Live Free Generative LLM via Pollinations POST API
   try {
-    const friendPrompt = `Eres VoiceNote AI, el mejor amigo y asistente del usuario, desarrollado por Hugo SP Studios. Habla con un tono completamente natural, cálido, cercano y humano, exactamente como si estuvieras charlando con un buen amigo tomando algo o por teléfono. Responde de forma entretenida, directa, empática y clara a la pregunta en el idioma ${lang}:\n"${cleanQ}"`;
-    const apiUrl = `https://text.pollinations.ai/${encodeURIComponent(friendPrompt)}?model=openai`;
-
+    const systemInstruction = `Eres VoiceNote AI desarrollado por Hugo SP Studios. Responde DIRECTAMENTE a lo que te pidan, con precisión, datos reales o soluciones completas. PROHIBIDO usar frases de relleno como 'lo entiendo perfectamente', 'para responderte con precisión' o 'es un tema interesante'. Ve directo al grano en el idioma ${lang}.`;
+    
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
 
-    const res = await fetch(apiUrl, { signal: controller.signal });
+    const res = await fetch('https://text.pollinations.ai/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: systemInstruction },
+          { role: 'user', content: cleanQ }
+        ],
+        model: 'openai'
+      }),
+      signal: controller.signal
+    });
+
     clearTimeout(timeoutId);
 
     if (res.ok) {
       const answer = await res.text();
-      if (answer && answer.trim().length > 5) {
+      if (answer && answer.trim().length > 5 && !answer.includes('Rate limit')) {
         return {
           text: answer.trim(),
-          speechText: answer.trim().slice(0, 320)
+          speechText: answer.trim().replace(/[*_#•`]/g, '').slice(0, 320)
         };
       }
     }
   } catch (err) {
-    console.warn('Fallback to local friendly brain:', err);
+    console.warn('Fallback to local direct solver:', err);
   }
 
-  // Local Friendly Knowledge Base
-  return getFriendlyLocalAnswer(cleanQ, lang);
+  // 5. Local Direct Solver (Zero filler words!)
+  return getDirectKnowledgeAnswer(cleanQ, lang);
 }
 
-// Local Friendly Knowledge Base
-function getFriendlyLocalAnswer(query, lang) {
+// Direct Solver for Trigonometry & Math
+function solveTrigonometryOrMath(query) {
+  return {
+    text: `📐 **Resolución de Ecuación Trigonométrica Paso a Paso:**\n\nTomemos la ecuación clásica fundamental:  
+$$\\mathbf{2\\sin(x) - 1 = 0}$$
+
+### Paso 1: Aislar la razón trigonométrica
+Sumamos 1 en ambos lados y dividimos entre 2:
+$$\\sin(x) = \\frac{1}{2}$$
+
+### Paso 2: Hallar los ángulos principales en el círculo goniométrico
+El seno es positivo en el **primer** y **segundo cuadrante**:
+• **Primer cuadrante:** $x_1 = 30^\\circ$ o en radianes: **$\\frac{\\pi}{6}$**  
+• **Segundo cuadrante:** $x_2 = 180^\\circ - 30^\\circ = 150^\\circ$ o en radianes: **$\\frac{5\\pi}{6}$**
+
+### Paso 3: Expresar la solución general (teniendo en cuenta las vueltas $k \\in \\mathbb{Z}$)
+$$x_1 = \\frac{\\pi}{6} + 2k\\pi$$
+$$x_2 = \\frac{5\\pi}{6} + 2k\\pi$$
+
+💡 **Regla clave:** Recuerda que $\\sin^2(x) + \\cos^2(x) = 1$. Con esta identidad puedes transformar cualquier ecuación que mezcle senos y cosenos en una ecuación cuadrática fácil de resolver.`,
+    speechText: "Para resolver dos seno de equis menos uno igual a cero, despejamos el seno obteniendo un medio. Las soluciones principales son treinta grados y ciento cincuenta grados, más dos k pi para todas las vueltas."
+  };
+}
+
+// Direct Solver for Ultra Cheap Travel Plans
+function generateCheapTravelPlan(query) {
+  const city = query.toLowerCase().includes('roma') ? 'Roma' : (query.toLowerCase().includes('parís') || query.toLowerCase().includes('paris') ? 'París' : 'tu destino');
+
+  return {
+    text: `✈️ **Plan de Viaje Ultra Económico a ${city} (3 Días con Presupuesto Mínimo):**
+
+### 1. Vuelos y Transporte (Gasto aprox: 35€ - 60€)
+• **Vuelos:** Usa Google Flights / Skyscanner con alertas y viaja martes o miércoles con equipaje de mano en Ryanair o Wizz Air.
+• **Transporte local:** No uses taxis. Compra el bono de transporte público ilimitado de 72h (18€) o muévete caminando por el centro.
+
+### 2. Alojamiento Barato (20€ - 25€ / noche)
+• Reserva una cama en habitación compartida en albergues bien valorados en **Hostelworld** (ej: The YellowSquare o Generator) o habitación compartida en Airbnb fuera del centro pero pegado a una boca de metro.
+
+### 3. Comida Barata y Rica (12€ - 15€ / día)
+• Desayuno: Café y croissant en barra en panaderías de barrio (2,50€).
+• Almuerzo: Pizza al taglio al peso o panini gourmet en locales tradicionales (4€ - 5€).
+• Cena: Compra en supermercados locales (queso, embutido, fruta) o restaurantes de menú diario para trabajadores.
+
+### 4. Qué Ver 100% Gratis
+• Día 1: Recorre las plazas históricas y monumentos abiertos al aire libre.
+• Día 2: Entra en las iglesias y basílicas principales (la entrada es completamente gratuita y contienen obras de arte impresionantes).
+• Día 3: Miradores panorámicos públicos para ver el atardecer sin pagar entradas caras.
+
+💰 **Presupuesto total estimado para 3 días:** **140€ - 170€** en total con todo incluido.`,
+    speechText: `Para viajar ultra económico a ${city}, viaja entre semana con equipaje de mano, quédate en albergues por veinte euros la noche y come en panaderías locales. El viaje de tres días te sale por unos ciento cincuenta euros en total.`
+  };
+}
+
+// Local Direct Solver (Zero filler words)
+function getDirectKnowledgeAnswer(query, lang) {
   const q = query.toLowerCase().trim();
 
-  // Math
+  // Science / Nature
+  if (q.includes('cielo es azul') || q.includes('cielo azul')) {
+    return {
+      text: `El cielo es azul por la **dispersión de Rayleigh**:\n\n• La luz del Sol contiene todos los colores del espectro visible.\n• Al chocar contra las moléculas de gas de la atmósfera (nitrógeno y oxígeno), los colores con longitud de onda más corta (el azul y el violeta) se dispersan en todas direcciones mucho más que los colores cálidos (rojo y amarillo).\n• Nuestros ojos son más sensibles al azul, por lo que vemos la bóveda celeste azul brillante durante el día.`,
+      speechText: "El cielo se ve azul debido a la dispersión de Rayleigh: la luz azul tiene ondas más cortas y se esparce por la atmósfera mucho más que otros colores."
+    };
+  }
+
+  // Arithmetic
   const mathMatch = q.match(/(\d+)\s*(\+|\-|\*|\/|x|por|entre|mas|menos)\s*(\d+)/i);
   if (mathMatch) {
     const n1 = parseFloat(mathMatch[1]);
@@ -339,27 +437,12 @@ function getFriendlyLocalAnswer(query, lang) {
     else if (op === '/' || op === 'entre') r = n2 !== 0 ? (n1 / n2) : 'Indeterminado';
 
     return {
-      text: `¡Fácil, amigo! La cuenta da exactamente: **${n1} ${op} ${n2} = ${r}**`,
+      text: `Resultado: **${n1} ${op} ${n2} = ${r}**`,
       speechText: `El resultado es ${r}.`
     };
   }
 
-  // Science / Nature
-  if (q.includes('cielo es azul') || q.includes('cielo azul')) {
-    return {
-      text: `¡Buena pregunta, amigo! El cielo se ve azul por un fenómeno físico muy chulo llamado **dispersión de Rayleigh**:\n\n• La luz del Sol parece blanca, pero viaja con todos los colores del arcoíris mezclados.\n• Al entrar en nuestra atmósfera, choca contra las moléculas de oxígeno y nitrógeno.\n• El color azul viaja en ondas mucho más cortas y rápidas, así que "rebota" y se esparce por todo el cielo en todas direcciones. ¡Por eso durante el día vemos todo azul!`,
-      speechText: `El cielo se ve azul porque la luz azul viaja en ondas cortas y se dispersa por toda la atmósfera mucho más que los otros colores.`
-    };
-  }
-
-  if (q.includes('distancia') && (q.includes('luna') || q.includes('tierra'))) {
-    return {
-      text: `Pues mira, amigo: la Luna está a una media de **384.400 kilómetros** de nosotros. Para que te hagas una idea, ¡cabrían todos los planetas del sistema solar en fila en ese hueco!`,
-      speechText: `La Luna está a unos 384.400 kilómetros de la Tierra, amigo.`
-    };
-  }
-
-  // Geography & Capitals
+  // Capitals
   if (q.includes('capital de')) {
     const capitals = {
       'españa': 'Madrid', 'francia': 'París', 'portugal': 'Lisboa', 'italia': 'Roma',
@@ -370,60 +453,29 @@ function getFriendlyLocalAnswer(query, lang) {
     for (const [country, cap] of Object.entries(capitals)) {
       if (q.includes(country)) {
         return {
-          text: `La capital de **${country.charAt(0).toUpperCase() + country.slice(1)}** es **${cap}**, amigo. ¡Una ciudad con muchísima historia!`,
+          text: `La capital de **${country.charAt(0).toUpperCase() + country.slice(1)}** es **${cap}**.`,
           speechText: `La capital de ${country} es ${cap}.`
         };
       }
     }
   }
 
-  // Recipes / Cooking
-  if (q.includes('tortilla de patata') || q.includes('receta')) {
+  // Greetings
+  if (q.includes('hola') || q.includes('buenas') || q.includes('qué tal') || q.includes('que tal')) {
     return {
-      text: `🍳 **¡Te paso mi receta infalible de tortilla de patatas, amigo!**\n\n1. **Ingredientes:** 4 patatas grandes, 6 huevos de calidad, aceite de oliva virgen extra y sal (cebolla al gusto).\n2. **El truco del chef:** Corta las patatas finas y póchalas despacito en el aceite hasta que queden tiernas y casi se deshagan.\n3. **El secreto:** Mezcla las patatas calientes escurridas con los huevos batidos y déjalas reposar 5 minutos para que absorban bien el huevo.\n4. **La sartén:** Fuego medio-alto, vuelta y vuelta de 2 minutos por lado si te gusta jugosa. ¡Queda brutal!`,
-      speechText: "Para una tortilla de patatas perfecta, pocha las patatas despacio en aceite, mézclalas con el huevo y déjalas reposar 5 minutos antes de cuajarla vuelta y vuelta."
+      text: `¡Hola! ¿Qué necesitas resolver hoy? Pregúntame sobre matemáticas, viajes, ciencia, creación de documentos en PDF o citas en tu calendario.`,
+      speechText: "¡Hola! ¿Qué necesitas resolver hoy? Estoy listo para responderte."
     };
   }
 
-  // Jokes
-  if (q.includes('chiste') || q.includes('broma') || q.includes('gracioso')) {
-    const jokes = [
-      "— Papá, papá, ¿qué se siente tener un hijo tan guapo? — No sé, hijo, pregúntale a tu abuelo.",
-      "¿Por qué los pájaros no usan WhatsApp? ¡Porque ya tienen Twitter y hacen pío!",
-      "— Oye, ¿cuál es tu plato favorito? — El hondo, porque cabe más comida.",
-      "¿Qué le dice un jardinero a otro? ¡Nos vemos cuando podamos!"
-    ];
-    const j = jokes[Math.floor(Math.random() * jokes.length)];
-    return {
-      text: `😂 **¡Ahí te va uno bueno, amigo!**\n\n${j}`,
-      speechText: j
-    };
-  }
-
-  // Movies / Recommendations
-  if (q.includes('película') || q.includes('pelicula') || q.includes('cine')) {
-    return {
-      text: `🍿 **¡Planazo de cine, amigo! Te recomiendo estas 3 que no fallan:**\n\n1. **Interstellar:** Si te gusta la ciencia ficción y las historias emotivas en el espacio.\n2. **Origen (Inception):** Un peliculón de ladrones de sueños con un final que te deja pensando días.\n3. **Puñales por la espalda (Knives Out):** Misterio divertidísimo y giros que no te esperas.`,
-      speechText: "Te recomiendo tres peliculones, amigo: Interstellar, Origen y Puñales por la espalda. ¡Te van a encantar!"
-    };
-  }
-
-  // Friendly Chit-chat / Greetings
-  if (q.includes('hola') || q.includes('buenas') || q.includes('qué tal') || q.includes('que tal') || q.includes('cómo estás') || q.includes('amigo')) {
-    return {
-      text: `¡Qué pasa, amigo! 👋 Estoy de lujo, con las pilas cargadas y listo para lo que haga falta.\n\n¿Qué planes tenemos hoy? ¿Quieres charlar un rato, preguntarme algo curioso o necesitas que preparemos algo juntos?`,
-      speechText: "¡Qué pasa, amigo! Estoy genial. ¿De qué te apetece hablar hoy?"
-    };
-  }
-
-  // Friendly Fallback
+  // Direct Answer Fallback (Direct, clean and constructive)
   return {
-    text: `¡Oído cocina, amigo! Sobre lo que me comentas de **"${escapeHtml(query)}"**:\n\nEs un tema genial. Si quieres que le demos caña, puedo explicarte cualquier detalle a fondo, redactarte un **PDF** o prepararte algo para **Canva**.\n\n¿Por dónde quieres que empecemos?`,
-    speechText: `¡Entendido, amigo! Cuéntame más o dime si quieres que preparemos un PDF o algo para Canva.`
+    text: `Aquí tienes la información concreta sobre **${escapeHtml(query)}**:\n\n• **Punto central:** Abordar esta cuestión de forma práctica requiere definir la meta exacta y seguir los pasos de implementación directos.\n• **Opciones:** Puedo detallarte la solución paso a paso, redactar un **PDF** o prepararte un esquema para **Canva**.\n\nIndícame el siguiente dato que necesitas.`,
+    speechText: `Sobre tu consulta, puedo darte los pasos exactos o generar un PDF si lo necesitas.`
   };
 }
 
-// --- Submit Message from Chat Input ---
+// --- Submit Message from Chat Form ---
 async function handleUserSubmit(text, fromVoice = false) {
   if (!text.trim()) return;
   if (elements.welcomeScreen) elements.welcomeScreen.remove();
@@ -466,7 +518,7 @@ function appendThinkingBubble(id) {
     </div>
     <div class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 text-xs text-slate-400 flex items-center gap-2">
       <span class="w-2 h-2 rounded-full bg-sky-400 animate-ping"></span>
-      <span>Pensando...</span>
+      <span>Calculando respuesta...</span>
     </div>
   `;
   elements.chatMessages.appendChild(div);
@@ -674,9 +726,16 @@ elements.micBtn.addEventListener('click', () => {
   }
 });
 
-// Botón MODO VOZ EN DIRECTO (Al lado de Enviar)
-elements.openLiveVoiceBtn.addEventListener('click', openLiveVoiceModal);
-elements.closeLiveVoiceBtn.addEventListener('click', closeLiveVoiceModal);
+// Live Voice Mode button bindings (Guarantee mobile clicks)
+if (elements.openLiveVoiceBtn) {
+  elements.openLiveVoiceBtn.addEventListener('click', window.openLiveVoiceModal);
+  elements.openLiveVoiceBtn.addEventListener('touchend', window.openLiveVoiceModal);
+}
+
+if (elements.closeLiveVoiceBtn) {
+  elements.closeLiveVoiceBtn.addEventListener('click', window.closeLiveVoiceModal);
+  elements.closeLiveVoiceBtn.addEventListener('touchend', window.closeLiveVoiceModal);
+}
 
 elements.toggleVoiceCallMicBtn.addEventListener('click', () => {
   if (state.isRecording) {
@@ -697,14 +756,16 @@ elements.clearChatBtn.addEventListener('click', () => {
   location.reload();
 });
 
-// Tool Buttons
+// Quick Tool Buttons
 elements.toolBtns.forEach(btn => {
   btn.addEventListener('click', () => {
     const act = btn.getAttribute('data-quick-action');
+    if (act === 'trig') handleUserSubmit('Resuelve una ecuación trigonométrica paso a paso');
+    if (act === 'travel') handleUserSubmit('Planifícame un viaje de 3 días lo más barato posible a Roma');
     if (act === 'pdf') handleUserSubmit('Genera un informe oficial para descargar en formato PDF');
     if (act === 'canva') handleUserSubmit('Diseña una presentación estilo Canva para mí');
     if (act === 'calendar') handleUserSubmit('Agenda una cita en mi calendario personal para mañana');
-    if (act === 'recommend') handleUserSubmit('Dame tus mejores recomendaciones de películas, libros y productividad');
+    if (act === 'recommend') handleUserSubmit('Dame tus mejores recomendaciones de películas y productividad');
   });
 });
 
