@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>VoiceNote AI - Tu Amigo y Asistente Universal</title>
-  <meta name="description" content="IA conversacional por voz y texto con respuestas matemáticas y voz humana. Desarrollada por Hugo SP Studios.">
+  <title>VoiceNote AI - Tu Asistente con Voz en Castellano</title>
+  <meta name="description" content="IA conversacional con voz hablada en castellano. Desarrollada por Hugo SP Studios.">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0284c7">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -47,7 +47,7 @@
   <!-- jsPDF CDN para generar PDFs -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   
-  <!-- KaTeX CDN para Renderizar Fórmulas y Símbolos Matemáticos Reales -->
+  <!-- KaTeX CDN para Renderizar Fórmulas y Símbolos Matemáticos -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
@@ -56,7 +56,7 @@
 </head>
 <body class="bg-[#0b1329] text-slate-100 min-h-screen flex flex-col font-sans selection:bg-sky-500 selection:text-white">
 
-  <!-- Header Superior -->
+  <!-- Header Superior Limpio -->
   <header class="border-b border-sky-950/80 bg-[#0b1329]/90 backdrop-blur-md sticky top-0 z-40">
     <div class="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
       <div class="flex items-center gap-2.5">
@@ -66,21 +66,19 @@
         <div>
           <div class="flex items-center gap-2">
             <span class="font-extrabold text-sm sm:text-base tracking-tight text-white">VoiceNote AI</span>
-            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">AMIGO IA</span>
+            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">VOZ ACTIVA</span>
           </div>
         </div>
       </div>
 
       <div class="flex items-center gap-2">
-        <!-- Selector de Idioma -->
-        <select id="langSelect" class="bg-slate-900 border border-slate-800 text-xs rounded-xl px-2.5 py-1.5 text-slate-300 focus:outline-none focus:border-sky-500 transition-colors">
-          <option value="es-ES">🇪🇸 Español</option>
-          <option value="fr-FR">🇫🇷 Français</option>
-          <option value="pt-BR">🇧🇷 Português</option>
-          <option value="zh-CN">🇨🇳 中文</option>
-        </select>
+        <!-- Indicador de Voz en Castellano -->
+        <span class="text-xs text-sky-300 bg-sky-950/60 border border-sky-800/60 px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-medium">
+          <i data-lucide="volume-2" class="w-3.5 h-3.5 text-sky-400"></i>
+          <span>Voz en Castellano</span>
+        </span>
 
-        <!-- Limpiar Chat -->
+        <!-- Limpiar Conversación -->
         <button id="clearChatBtn" class="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors" title="Nueva conversación">
           <i data-lucide="plus" class="w-4 h-4"></i>
         </button>
@@ -88,80 +86,101 @@
     </div>
   </header>
 
-  <!-- Barra de Herramientas Rápidas -->
-  <div class="border-b border-sky-950/60 bg-[#080d1d]/60 py-2 px-4 overflow-x-auto">
-    <div class="max-w-4xl mx-auto flex items-center gap-2 text-xs">
-      <span class="text-slate-400 text-[11px] font-semibold uppercase tracking-wider hidden sm:inline">Herramientas:</span>
-      <button data-quick-action="trig" class="tool-btn px-2.5 py-1 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5 flex-shrink-0 transition-colors">
-        <i data-lucide="calculator" class="w-3.5 h-3.5 text-indigo-400"></i> Ecuación Trigonométrica
-      </button>
-      <button data-quick-action="travel" class="tool-btn px-2.5 py-1 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5 flex-shrink-0 transition-colors">
-        <i data-lucide="plane" class="w-3.5 h-3.5 text-emerald-400"></i> Viaje Barato
-      </button>
-      <button data-quick-action="pdf" class="tool-btn px-2.5 py-1 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5 flex-shrink-0 transition-colors">
-        <i data-lucide="file-down" class="w-3.5 h-3.5 text-rose-400"></i> Crear PDF
-      </button>
-      <button data-quick-action="canva" class="tool-btn px-2.5 py-1 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5 flex-shrink-0 transition-colors">
-        <i data-lucide="palette" class="w-3.5 h-3.5 text-cyan-400"></i> Diseños / Canva
-      </button>
-      <button data-quick-action="calendar" class="tool-btn px-2.5 py-1 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5 flex-shrink-0 transition-colors">
-        <i data-lucide="calendar" class="w-3.5 h-3.5 text-amber-400"></i> Agendar Cita
-      </button>
-    </div>
-  </div>
-
-  <!-- Contenedor Principal de Chat -->
+  <!-- Contenedor Principal de Chat (Puro y Limpio, Sin Botones de Relleno) -->
   <main class="flex-1 max-w-4xl w-full mx-auto px-4 py-4 flex flex-col justify-between">
     
     <!-- Feed de Conversación -->
     <div id="chatMessages" class="flex-1 space-y-4 overflow-y-auto pb-4">
       
-      <!-- Portada de Bienvenida -->
-      <div id="welcomeScreen" class="text-center py-8 sm:py-12 space-y-4">
-        <div class="w-16 h-16 mx-auto rounded-3xl bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center shadow-2xl shadow-sky-500/30 ring-4 ring-sky-500/20">
-          <i data-lucide="bot" class="w-8 h-8 text-white"></i>
+      <!-- Portada con Robot Animado -->
+      <div id="welcomeScreen" class="text-center py-10 sm:py-16 space-y-5 animate-fade-in">
+
+        <!-- Robot SVG con animación de guiño -->
+        <div class="relative inline-block">
+          <svg id="robotWink" viewBox="0 0 120 130" width="130" height="130" xmlns="http://www.w3.org/2000/svg" class="mx-auto drop-shadow-2xl">
+            <!-- Antena -->
+            <line x1="60" y1="0" x2="60" y2="18" stroke="#38bdf8" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="60" cy="5" r="5" fill="#38bdf8">
+              <animate attributeName="r" values="5;7;5" dur="1.5s" repeatCount="indefinite"/>
+              <animate attributeName="fill" values="#38bdf8;#7dd3fc;#38bdf8" dur="1.5s" repeatCount="indefinite"/>
+            </circle>
+
+            <!-- Cabeza -->
+            <rect x="15" y="18" width="90" height="72" rx="18" ry="18" fill="url(#headGrad)"/>
+            <defs>
+              <linearGradient id="headGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#0ea5e9"/>
+                <stop offset="100%" style="stop-color:#1d4ed8"/>
+              </linearGradient>
+              <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#0284c7"/>
+                <stop offset="100%" style="stop-color:#1e40af"/>
+              </linearGradient>
+            </defs>
+
+            <!-- Brillo en la cabeza -->
+            <ellipse cx="40" cy="30" rx="18" ry="8" fill="white" opacity="0.12"/>
+
+            <!-- Ojo izquierdo (parpadea normal) -->
+            <g id="eyeLeft">
+              <circle cx="40" cy="50" r="11" fill="#0f172a"/>
+              <circle cx="40" cy="50" r="7" fill="#38bdf8"/>
+              <circle cx="43" cy="47" r="2.5" fill="white"/>
+              <!-- Párpado normal -->
+              <rect id="lidLeft" x="29" y="39" width="22" height="0" rx="4" fill="#0ea5e9">
+                <animate attributeName="height" values="0;22;0" dur="3s" begin="0.5s" repeatCount="indefinite"/>
+              </rect>
+            </g>
+
+            <!-- Ojo derecho (guiño) -->
+            <g id="eyeRight">
+              <circle cx="80" cy="50" r="11" fill="#0f172a"/>
+              <circle cx="80" cy="50" r="7" fill="#38bdf8"/>
+              <circle cx="83" cy="47" r="2.5" fill="white"/>
+              <!-- Párpado de GUIÑO (baja completamente en distintos tiempos) -->
+              <rect id="lidRight" x="69" y="39" width="22" height="0" rx="4" fill="#0ea5e9">
+                <animate attributeName="height" values="0;22;22;0" keyTimes="0;0.2;0.8;1" dur="3s" begin="1.5s" repeatCount="indefinite"/>
+              </rect>
+            </g>
+
+            <!-- Nariz LED -->
+            <circle cx="60" cy="63" r="4" fill="#fbbf24">
+              <animate attributeName="opacity" values="1;0.4;1" dur="2s" repeatCount="indefinite"/>
+            </circle>
+
+            <!-- Boca / Sonrisa -->
+            <path d="M 40 76 Q 60 90 80 76" stroke="#7dd3fc" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+
+            <!-- Cuerpo -->
+            <rect x="25" y="93" width="70" height="36" rx="12" ry="12" fill="url(#bodyGrad)"/>
+
+            <!-- Micrófono en el cuerpo -->
+            <rect x="53" y="100" width="14" height="18" rx="7" fill="#38bdf8" opacity="0.9"/>
+            <path d="M46 113 Q60 124 74 113" stroke="#7dd3fc" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            <line x1="60" y1="122" x2="60" y2="129" stroke="#7dd3fc" stroke-width="2.5" stroke-linecap="round"/>
+
+            <!-- Orejas / botones laterales -->
+            <rect x="6" y="35" width="10" height="20" rx="5" fill="#0284c7"/>
+            <rect x="104" y="35" width="10" height="20" rx="5" fill="#0284c7"/>
+          </svg>
+
+          <!-- Destello de entrada -->
+          <div class="absolute inset-0 rounded-full bg-sky-400/20 animate-ping" style="animation-duration:2s; animation-iteration-count:2;"></div>
         </div>
+
         <div>
-          <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">¡Hola! ¿En qué nos ponemos hoy?</h1>
-          <p class="text-xs sm:text-sm text-slate-400 max-w-md mx-auto mt-1">
-            Respuestas matemáticas con símbolos reales, voz humana y soluciones directas a tus preguntas.
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">VoiceNote AI</h1>
+          <p class="text-xs sm:text-sm text-slate-400 max-w-xs mx-auto mt-2 leading-relaxed">
+            Pregúntame lo que quieras.<br>Te responderé con <span class="text-sky-400 font-semibold">voz en castellano</span>.
           </p>
         </div>
 
-        <!-- Tarjetas de Sugerencias -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-lg mx-auto pt-2 text-left">
-          <button data-prompt="Resuélveme la ecuación trigonométrica 2 sen(x) - 1 = 0 con todos sus pasos y símbolos matemáticos" class="prompt-card p-3 rounded-2xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 text-xs text-slate-300 hover:text-white transition-all flex items-start gap-2.5">
-            <span class="text-lg">📐</span>
-            <div>
-              <strong class="block text-slate-200">Ecuación Trigonométrica</strong>
-              <span class="text-[11px] text-slate-500">2 sen(x) - 1 = 0 con fórmulas paso a paso</span>
-            </div>
-          </button>
-
-          <button data-prompt="Planifícame un viaje de 3 días lo más barato posible a Roma con presupuesto exacto" class="prompt-card p-3 rounded-2xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 text-xs text-slate-300 hover:text-white transition-all flex items-start gap-2.5">
-            <span class="text-lg">✈️</span>
-            <div>
-              <strong class="block text-slate-200">Viaje Ultra Económico</strong>
-              <span class="text-[11px] text-slate-500">Vuelos low cost, hostels y comida barata</span>
-            </div>
-          </button>
-
-          <button data-prompt="¿Por qué el cielo es azul y qué es la dispersión de Rayleigh?" class="prompt-card p-3 rounded-2xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 text-xs text-slate-300 hover:text-white transition-all flex items-start gap-2.5">
-            <span class="text-lg">🌍</span>
-            <div>
-              <strong class="block text-slate-200">Ciencia y Física</strong>
-              <span class="text-[11px] text-slate-500">Explicación clara y sin rodeos</span>
-            </div>
-          </button>
-
-          <button data-prompt="Agenda una cita de dentista para el próximo viernes a las 11:30" class="prompt-card p-3 rounded-2xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 text-xs text-slate-300 hover:text-white transition-all flex items-start gap-2.5">
-            <span class="text-lg">📅</span>
-            <div>
-              <strong class="block text-slate-200">Agendar Cita</strong>
-              <span class="text-[11px] text-slate-500">Google Calendar o Apple Calendar</span>
-            </div>
-          </button>
+        <!-- Indicador de disponibilidad -->
+        <div class="flex items-center justify-center gap-2 text-xs text-slate-500">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>IA lista y escuchándote</span>
         </div>
+
       </div>
 
     </div>
@@ -176,7 +195,7 @@
         </button>
 
         <!-- Campo de Texto -->
-        <input type="text" id="chatInput" placeholder="Haz una pregunta o problema de matemáticas..." autocomplete="off" class="flex-1 bg-transparent px-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none">
+        <input type="text" id="chatInput" placeholder="Escribe o habla conmigo..." autocomplete="off" class="flex-1 bg-transparent px-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none">
 
         <!-- Botón Enviar Mensaje Escrito -->
         <button type="submit" id="sendBtn" class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-sky-600 text-slate-400 hover:text-white flex items-center justify-center transition-all flex-shrink-0 active:scale-95" title="Enviar mensaje">
@@ -184,9 +203,9 @@
         </button>
 
         <!-- BOTÓN MODO VOZ: COMPACTO (w-10 h-10) Y AL LADO DE ENVIAR -->
-        <button type="button" id="openLiveVoiceBtn" class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 via-sky-600 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white flex items-center justify-center flex-shrink-0 shadow-lg shadow-sky-500/30 active:scale-95 transition-all relative" title="Iniciar conversación de voz humana con el orbe">
+        <button type="button" id="openLiveVoiceBtn" class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 via-sky-600 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white flex items-center justify-center flex-shrink-0 shadow-lg shadow-sky-500/30 active:scale-95 transition-all relative" title="Hablar con la IA en directo con voz en castellano">
           <span class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#0b1329] animate-pulse"></span>
-          <i data-lucide="sparkles" class="w-4 h-4"></i>
+          <i data-lucide="audio-lines" class="w-4 h-4"></i>
         </button>
       </form>
 
@@ -210,9 +229,12 @@
     <div class="w-full max-w-md flex items-center justify-between text-xs text-slate-400">
       <div class="flex items-center gap-2">
         <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
-        <span class="font-semibold text-slate-200">Conversación de Voz en Directo</span>
+        <span class="font-semibold text-slate-200">Modo Voz en Directo</span>
       </div>
-      <span id="voiceLanguageTag" class="px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 text-[10px] font-bold border border-sky-500/30">ESPAÑOL</span>
+      <span class="px-2.5 py-1 rounded-full bg-sky-500/20 text-sky-300 text-[11px] font-bold border border-sky-500/30 flex items-center gap-1.5">
+        <i data-lucide="volume-2" class="w-3.5 h-3.5"></i>
+        <span>VOZ EN CASTELLANO</span>
+      </span>
     </div>
 
     <!-- Centro: Esfera Holográfica Amigable -->
@@ -226,20 +248,20 @@
 
       <!-- Estado en tiempo real -->
       <p id="voiceStatusText" class="mt-8 text-base font-bold text-sky-300 tracking-wide text-center">
-        ¡Hola! Te escucho, háblame...
+        ¡Hola! Te escucho, dime lo que quieras...
       </p>
 
-      <!-- Subtítulo en tiempo real -->
+      <!-- Subtítulo de lo que hablas -->
       <div class="mt-3 max-w-sm text-center px-4">
         <p id="voiceTranscriptPreview" class="text-xs sm:text-sm text-slate-300 font-medium italic min-h-[40px] leading-relaxed">
-          "Dime lo que quieras, charlamos como colegas..."
+          "Háblame de lo que quieras, te responderé con mi voz..."
         </p>
       </div>
 
-      <!-- Botón Manual de Reproducir Voz (Por si Safari lo bloquea) -->
-      <button id="manualSpeakBtn" class="mt-4 px-4 py-2 rounded-xl bg-sky-600/30 hover:bg-sky-600/50 text-sky-300 border border-sky-500/30 text-xs font-semibold flex items-center gap-2 transition-all hidden">
-        <i data-lucide="volume-2" class="w-4 h-4"></i>
-        <span>Toca para escuchar respuesta con voz</span>
+      <!-- Botón de Repetición de Voz -->
+      <button type="button" id="manualSpeakBtn" class="mt-4 px-4 py-2 rounded-xl bg-sky-600/30 hover:bg-sky-600/50 text-sky-300 border border-sky-500/30 text-xs font-semibold flex items-center gap-2 transition-all active:scale-95 shadow-lg mx-auto" title="Toca para escuchar en voz alta">
+        <i data-lucide="volume-2" class="w-4 h-4 text-sky-300"></i>
+        <span id="manualSpeakText">Escuchar con voz en castellano</span>
       </button>
     </div>
 

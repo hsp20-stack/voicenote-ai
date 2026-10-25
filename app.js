@@ -1,10 +1,9 @@
 /**
- * VoiceNote AI - Tu Amigo y Asistente Universal
+ * VoiceNote AI - Tu Asistente con Voz Hablada en Castellano
  * Desarrollada por Hugo SP Studios.
- * - Desbloqueo de audio nativo para iPhone/Safari
- * - Renderizado matemático real con KaTeX (fracciones, raíces, símbolos)
- * - Explicaciones matemáticas paso a paso
- * - Modo Voz continuo con orbe interactivo
+ * - Modo Voz en Directo (al lado de enviar) con voz humana en castellano
+ * - Cambio de sesión de audio optimizado para iPhone/Safari (200ms switch)
+ * - Respuestas matemáticas y explicaciones habladas fluidas
  */
 
 const state = {
@@ -14,7 +13,7 @@ const state = {
   isAiSpeaking: false,
   recognition: null,
   availableVoices: [],
-  lastAiAnswerText: ''
+  lastAiSpeechText: ''
 };
 
 // --- DOM References ---
@@ -27,12 +26,9 @@ const elements = {
   micIcon: document.getElementById('micIcon'),
   sendBtn: document.getElementById('sendBtn'),
   openLiveVoiceBtn: document.getElementById('openLiveVoiceBtn'),
-  langSelect: document.getElementById('langSelect'),
   clearChatBtn: document.getElementById('clearChatBtn'),
-  toolBtns: document.querySelectorAll('[data-quick-action]'),
-  promptCards: document.querySelectorAll('[data-prompt]'),
   
-  // Live Voice Modal Elements
+  // Live Voice Modal
   liveVoiceModal: document.getElementById('liveVoiceModal'),
   closeLiveVoiceBtn: document.getElementById('closeLiveVoiceBtn'),
   toggleVoiceCallMicBtn: document.getElementById('toggleVoiceCallMicBtn'),
@@ -40,7 +36,6 @@ const elements = {
   voiceOrb: document.getElementById('voiceOrb'),
   voiceStatusText: document.getElementById('voiceStatusText'),
   voiceTranscriptPreview: document.getElementById('voiceTranscriptPreview'),
-  voiceLanguageTag: document.getElementById('voiceLanguageTag'),
   orbCenterIcon: document.getElementById('orbCenterIcon'),
   manualSpeakBtn: document.getElementById('manualSpeakBtn')
 };
@@ -66,7 +61,7 @@ function renderMathFormulas(element) {
   }
 }
 
-// --- Voice Engine: Safari Audio Unlocker & Human Voice ---
+// --- Voice Engine: Carga de Voces en Castellano ---
 function initVoices() {
   if ('speechSynthesis' in window) {
     const loadVoices = () => {
@@ -77,41 +72,33 @@ function initVoices() {
   }
 }
 
-// Desbloqueo de audio obligatorio para iOS Safari en el primer toque
-function unlockSafariAudio() {
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.resume();
-    const silent = new SpeechSynthesisUtterance(' ');
-    silent.volume = 0.05;
-    silent.rate = 10;
-    window.speechSynthesis.speak(silent);
-  }
-}
-
-function speakHumanVoice(text, lang = state.language, onEndCallback = null) {
+// Reproducción de voz humana en Castellano (optimizada para iOS y Android)
+function speakSpanishVoice(text, onEndCallback = null) {
   if (!('speechSynthesis' in window) || !text) {
     if (onEndCallback) onEndCallback();
     return;
   }
 
+  // Detener el micrófono antes de hablar para que Safari no silencie el altavoz
+  stopSpeechRecognizer();
+
   window.speechSynthesis.cancel();
   window.speechSynthesis.resume();
   state.isAiSpeaking = true;
-  state.lastAiAnswerText = text;
+  state.lastAiSpeechText = text;
 
-  // Make manual speak button visible as helper if needed
   if (elements.manualSpeakBtn) {
     elements.manualSpeakBtn.classList.remove('hidden');
   }
 
   if (state.isLiveCallActive) {
-    elements.voiceStatusText.textContent = "Te estoy respondiendo con voz...";
+    elements.voiceStatusText.textContent = "VoiceNote AI te está hablando en castellano...";
     elements.voiceOrb.className = "w-48 h-48 sm:w-56 sm:h-56 rounded-full bg-gradient-to-tr from-cyan-400 via-sky-500 to-blue-600 animate-orb-glow flex items-center justify-center relative cursor-pointer shadow-2xl transition-all scale-105";
     elements.orbCenterIcon.setAttribute('data-lucide', 'volume-2');
     refreshIcons();
   }
 
-  // Clean mathematical and markdown symbols for natural voice
+  // Limpiar texto para pronunciación perfecta en castellano
   const clean = text
     .replace(/\$\$.*?\$\$/g, '')
     .replace(/\$.*?\$/g, '')
@@ -121,21 +108,21 @@ function speakHumanVoice(text, lang = state.language, onEndCallback = null) {
     .replace(/\\pi/g, 'pi')
     .replace(/\\sin/g, 'seno')
     .replace(/\\cos/g, 'coseno')
-    .slice(0, 480);
+    .slice(0, 500);
 
   const utterance = new SpeechSynthesisUtterance(clean);
-  utterance.lang = lang;
-  utterance.rate = 1.0;
-  utterance.pitch = 1.04;
+  utterance.lang = 'es-ES'; // Castellano estándar de España
+  utterance.rate = 0.98;     // Velocidad natural humana
+  utterance.pitch = 1.0;
 
+  // Seleccionar la mejor voz disponible en español
   if (state.availableVoices.length > 0) {
-    const langPrefix = lang.split('-')[0].toLowerCase();
-    const naturalVoice = state.availableVoices.find(v => 
-      v.lang.toLowerCase().startsWith(langPrefix) && 
-      (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Siri') || v.name.includes('Monica') || v.name.includes('Paulina') || v.name.includes('Jorge'))
-    ) || state.availableVoices.find(v => v.lang.toLowerCase().startsWith(langPrefix));
+    const spanishVoice = state.availableVoices.find(v => 
+      v.lang.toLowerCase().startsWith('es') && 
+      (v.name.includes('Spain') || v.name.includes('España') || v.name.includes('Mónica') || v.name.includes('Monica') || v.name.includes('Jorge') || v.name.includes('Siri') || v.name.includes('Google español'))
+    ) || state.availableVoices.find(v => v.lang.toLowerCase().startsWith('es'));
 
-    if (naturalVoice) utterance.voice = naturalVoice;
+    if (spanishVoice) utterance.voice = spanishVoice;
   }
 
   utterance.onend = () => {
@@ -146,6 +133,7 @@ function speakHumanVoice(text, lang = state.language, onEndCallback = null) {
       elements.orbCenterIcon.setAttribute('data-lucide', 'mic');
       refreshIcons();
 
+      // En iPhone, esperar 300ms para que Safari libere el altavoz y abra el micrófono
       setTimeout(() => {
         if (state.isLiveCallActive && !state.isAiSpeaking) {
           startSpeechRecognizer();
@@ -171,7 +159,7 @@ function setupSpeechRecognition() {
   const recog = new SpeechRecognition();
   recog.continuous = false;
   recog.interimResults = true;
-  recog.lang = state.language;
+  recog.lang = 'es-ES';
 
   recog.onresult = (event) => {
     let interim = '';
@@ -196,7 +184,7 @@ function setupSpeechRecognition() {
 
     if (state.isLiveCallActive) {
       const recognized = elements.voiceTranscriptPreview.textContent.replace(/^"|"$/g, '').trim();
-      if (recognized && !recognized.startsWith('Dime lo que quieras') && !state.isAiSpeaking) {
+      if (recognized && !recognized.startsWith('Háblame') && !recognized.startsWith('Dime lo que quieras') && !state.isAiSpeaking) {
         handleVoiceExchange(recognized);
       }
     } else {
@@ -228,7 +216,7 @@ function startSpeechRecognizer() {
   if (!state.recognition) state.recognition = setupSpeechRecognition();
 
   if (state.recognition) {
-    state.recognition.lang = state.language;
+    state.recognition.lang = 'es-ES';
     try {
       state.isRecording = true;
       state.recognition.start();
@@ -243,15 +231,12 @@ function stopSpeechRecognizer() {
   }
 }
 
-// --- Live Voice Mode Controls ---
+// --- Live Voice Mode Controls (El apartado al lado de Enviar) ---
 function openLiveVoiceModal(e) {
   if (e) {
     e.preventDefault();
     e.stopPropagation();
   }
-
-  // 1. Desbloquear audio de Safari inmediatamente en el gesto
-  unlockSafariAudio();
 
   state.isLiveCallActive = true;
   const modal = document.getElementById('liveVoiceModal');
@@ -260,29 +245,14 @@ function openLiveVoiceModal(e) {
     modal.style.display = 'flex';
   }
 
-  const langNames = {
-    'es-ES': 'ESPAÑOL',
-    'fr-FR': 'FRANÇAIS',
-    'pt-BR': 'PORTUGUÊS',
-    'zh-CN': '中文'
-  };
-  elements.voiceLanguageTag.textContent = langNames[state.language] || 'ESPAÑOL';
-
-  const friendlyGreetings = {
-    'es-ES': '¡Hola! Te escucho perfectamente. Pídeme lo que quieras y te respondo.',
-    'fr-FR': 'Bonjour ! Je vous écoute. Posez-moi vos questions.',
-    'pt-BR': 'Olá! Estou te ouvindo perfeitamente. Pode falar.',
-    'zh-CN': '你好！我正在听，请随时告诉我。'
-  };
-
-  const greeting = friendlyGreetings[state.language] || friendlyGreetings['es-ES'];
-  elements.voiceStatusText.textContent = "Conectando voz...";
+  const greeting = '¡Hola! Te escucho perfectamente. Dime lo que quieras y te hablo en castellano.';
+  elements.voiceStatusText.textContent = "VoiceNote AI te está hablando...";
   elements.voiceTranscriptPreview.textContent = `"${greeting}"`;
 
-  // Reproducir voz de saludo
-  speakHumanVoice(greeting, state.language, () => {
+  // Reproducir directamente el saludo con voz en castellano en este toque
+  speakSpanishVoice(greeting, () => {
     if (state.isLiveCallActive) {
-      elements.voiceStatusText.textContent = "¡Te escucho! Háblame...";
+      elements.voiceStatusText.textContent = "¡Te escucho! Háblame ahora...";
       startSpeechRecognizer();
     }
   });
@@ -305,26 +275,29 @@ function closeLiveVoiceModal(e) {
   }
 }
 
-// Voice Exchange Handler in Modal
+// Conversación dentro del apartado del Orbe (Pura voz humana)
 async function handleVoiceExchange(userText) {
   if (!userText || state.isAiSpeaking) return;
 
   if (elements.welcomeScreen) elements.welcomeScreen.remove();
   appendMessageBubble('user', userText, true);
 
-  elements.voiceStatusText.textContent = "Pensando la solución...";
+  elements.voiceStatusText.textContent = "Pensando qué responderte...";
   elements.voiceOrb.className = "w-48 h-48 sm:w-56 sm:h-56 rounded-full bg-gradient-to-tr from-indigo-500 via-sky-500 to-pink-500 animate-pulse flex items-center justify-center relative cursor-pointer shadow-2xl transition-all";
 
-  const aiResult = await fetchRealAiResponse(userText, state.language);
+  const aiResult = await fetchRealAiResponse(userText);
 
   appendMessageBubble('ai', aiResult.text, false, aiResult);
   elements.voiceTranscriptPreview.textContent = `"${aiResult.speechText || aiResult.text}"`;
 
-  speakHumanVoice(aiResult.speechText || aiResult.text, state.language);
+  // Pausa de 200ms para que Safari libere el canal de audio del micrófono antes de hablar
+  setTimeout(() => {
+    speakSpanishVoice(aiResult.speechText || aiResult.text);
+  }, 200);
 }
 
-// --- Real AI Query Engine (Explicaciones Matemáticas Reales y Sin Relleno) ---
-async function fetchRealAiResponse(query, lang) {
+// --- Real AI Query Engine (Respuestas Reales y Directas) ---
+async function fetchRealAiResponse(query) {
   const cleanQ = query.trim();
   const lower = cleanQ.toLowerCase();
 
@@ -338,25 +311,18 @@ async function fetchRealAiResponse(query, lang) {
     return generateCheapTravelPlan(cleanQ);
   }
 
-  // 3. Action Commands (PDF, Canva, Calendar)
+  // 3. Documentos PDF
   if (lower.includes('pdf') || lower.includes('descargar informe')) {
     return {
-      text: `📄 **Documento Oficial Listo para Generar:**\n\n• **Título:** Informe Oficial VoiceNote AI\n• **Autor:** Hugo SP Studios\n• **Fecha:** ${new Date().toLocaleDateString()}\n\nPulsa el botón de abajo para descargarlo de inmediato en formato PDF.`,
+      text: `📄 **Documento Oficial Listo:**\n\n• **Título:** Informe Oficial VoiceNote AI\n• **Autor:** Hugo SP Studios\n• **Fecha:** ${new Date().toLocaleDateString()}\n\nPulsa abajo para descargarlo en PDF.`,
       pdfAction: true,
       pdfTitle: "Informe_Oficial_Hugo_SP_Studios",
-      pdfContent: `DOCUMENTO OFICIAL\nDesarrollado por Hugo SP Studios\nFecha: ${new Date().toLocaleDateString()}\n\nContenido del informe generado automáticamente respondiendo a la solicitud del usuario.\n\nTodo organizado y listo para usar.`,
+      pdfContent: `DOCUMENTO OFICIAL\nDesarrollado por Hugo SP Studios\nFecha: ${new Date().toLocaleDateString()}\n\nInforme preparado para el usuario por VoiceNote AI.`,
       speechText: "Te he preparado el documento oficial en PDF listo para descargar."
     };
   }
 
-  if (lower.includes('canva') || lower.includes('diseño') || lower.includes('presentación') || lower.includes('diapositiva')) {
-    return {
-      text: `🎨 **Estructura para Presentación en Canva:**\n\n1. **Diapositiva 1 (Portada):** Fondo azul oscuro \`#0b1329\` con tipografía grande blanca y subtítulo cian \`#38bdf8\`.\n2. **Diapositiva 2 (Desarrollo):** 3 bloques limpios con iconos modernos y cifras clave.\n3. **Diapositiva 3 (Llamada a la Acción):** Botón central destacado y contacto.\n\nPuedes abrir Canva directamente abajo.`,
-      canvaAction: true,
-      speechText: "Te he preparado la estructura y la paleta de colores para tu presentación en Canva."
-    };
-  }
-
+  // 4. Calendario
   if (lower.includes('cita') || lower.includes('agenda') || lower.includes('reunión') || lower.includes('calendario') || lower.includes('dentista') || lower.includes('médico')) {
     const title = lower.includes('dentista') ? 'Cita con el Dentista' : (lower.includes('médico') ? 'Cita Médica' : 'Reunión Agendada');
     return {
@@ -367,9 +333,9 @@ async function fetchRealAiResponse(query, lang) {
     };
   }
 
-  // 4. Generative LLM via Pollinations POST API
+  // 5. Generative LLM via Pollinations POST API
   try {
-    const systemInstruction = `Eres VoiceNote AI desarrollado por Hugo SP Studios. Responde DIRECTAMENTE y con máxima precisión matemática, científica o práctica. Si te piden matemáticas, incluye fórmulas en formato LaTeX con $$ o $. PROHIBIDO usar frases de relleno como 'lo entiendo perfectamente' o 'para responderte con precisión'. Ve directo a los datos en el idioma ${lang}.`;
+    const systemInstruction = `Eres VoiceNote AI desarrollado por Hugo SP Studios. Responde en castellano DIRECTAMENTE a lo que te pidan, con precisión matemática o datos reales. PROHIBIDO usar frases de relleno como 'lo entiendo perfectamente' o 'para responderte con precisión'. Ve directo a la solución.`;
     
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
@@ -394,65 +360,50 @@ async function fetchRealAiResponse(query, lang) {
       if (answer && answer.trim().length > 5 && !answer.includes('Rate limit')) {
         return {
           text: answer.trim(),
-          speechText: answer.trim().replace(/[*_#•`$\\]/g, '').slice(0, 320)
+          speechText: answer.trim().replace(/[*_#•`$\\]/g, '').slice(0, 350)
         };
       }
     }
   } catch (err) {
-    console.warn('Fallback to local direct solver:', err);
+    console.warn('Fallback local:', err);
   }
 
-  // 5. Local Direct Solver
-  return getDirectKnowledgeAnswer(cleanQ, lang);
+  // 6. Local Direct Solver
+  return getDirectKnowledgeAnswer(cleanQ);
 }
 
 // Explicación Matemática y Trigonométrica Rigurosa con KaTeX
 function solveTrigonometryOrMath(query) {
   return {
-    text: `📐 **Resolución Completa de Ecuación Trigonométrica:**
+    text: `📐 **Resolución de la Ecuación Trigonométrica:**
 
-Vamos a resolver paso a paso la ecuación fundamental:
 $$2\\sin(x) - 1 = 0$$
 
 ---
 
-### Paso 1: Despejar la razón trigonométrica
-Sumamos $1$ en ambos miembros y dividimos entre $2$:
+### Paso 1: Despejar la función seno
+Sumamos $1$ y dividimos entre $2$:
 $$2\\sin(x) = 1 \\implies \\sin(x) = \\frac{1}{2}$$
 
 ---
 
-### Paso 2: Hallar los ángulos en el círculo goniométrico ($0^\\circ \\le x < 360^\\circ$)
-Buscamos qué ángulos tienen un seno igual a $\\frac{1}{2}$. Como el valor es positivo, las soluciones están en el **Primer** y **Segundo cuadrante**:
+### Paso 2: Hallar los ángulos notables en la circunferencia ($0^\\circ \\le x < 360^\\circ$)
+Buscamos en qué cuadrantes el seno es positivo: en el **primer cuadrante ($I$)** y en el **segundo cuadrante ($II$)**:
 
-1. **En el Primer Cuadrante ($I$):**  
-   El ángulo notable directo es:
+1. **Primer Cuadrante:**
    $$x_1 = 30^\\circ = \\frac{\\pi}{6} \\text{ rad}$$
 
-2. **En el Segundo Cuadrante ($II$):**  
-   Por simetría ($180^\\circ - \\alpha$):
+2. **Segundo Cuadrante:**
    $$x_2 = 180^\\circ - 30^\\circ = 150^\\circ = \\frac{5\\pi}{6} \\text{ rad}$$
 
 ---
 
-### Paso 3: Solución General (para todas las vueltas $k \\in \\mathbb{Z}$)
-Como las funciones trigonométricas son periódicas cada $360^\\circ$ ($2\\pi$ radianes):
+### Paso 3: Solución General (todas las vueltas $k \\in \\mathbb{Z}$)
 $$x_1 = \\frac{\\pi}{6} + 2k\\pi, \\quad k \\in \\mathbb{Z}$$
 $$x_2 = \\frac{5\\pi}{6} + 2k\\pi, \\quad k \\in \\mathbb{Z}$$
 
----
-
-### 📊 Tabla de Valores Notables para Recordar:
-| Ángulo ($^\\circ$) | Ángulo (rad) | $\\sin(x)$ | $\\cos(x)$ | $\\tan(x)$ |
-| :--- | :--- | :--- | :--- | :--- |
-| **$0^\\circ$** | $0$ | $0$ | $1$ | $0$ |
-| **$30^\\circ$** | $\\frac{\\pi}{6}$ | **$\\frac{1}{2}$** | $\\frac{\\sqrt{3}}{2}$ | $\\frac{\\sqrt{3}}{3}$ |
-| **$45^\\circ$** | $\\frac{\\pi}{4}$ | $\\frac{\\sqrt{2}}{2}$ | $\\frac{\\sqrt{2}}{2}$ | $1$ |
-| **$60^\\circ$** | $\\frac{\\pi}{3}$ | $\\frac{\\sqrt{3}}{2}$ | $\\frac{1}{2}$ | $\\sqrt{3}$ |
-| **$90^\\circ$** | $\\frac{\\pi}{2}$ | $1$ | $0$ | *No existe* |
-
-💡 **Identidad Fundamental:** Recuerda siempre que $\\sin^2(x) + \\cos^2(x) = 1$.`,
-    speechText: "Para resolver dos seno de equis menos uno igual a cero, despejamos el seno obteniendo un medio. Las soluciones principales en el círculo son treinta grados y ciento cincuenta grados, más dos k pi para todas las vueltas."
+💡 **Identidad Fundamental:** $\\sin^2(x) + \\cos^2(x) = 1$.`,
+    speechText: "Para resolver dos seno de equis menos uno igual a cero, despejamos el seno sumando uno y dividiendo entre dos, obteniendo seno de equis igual a un medio. En el primer cuadrante el ángulo es treinta grados, que es pi sobre seis radianes. En el segundo cuadrante es ciento cincuenta grados, que es cinco pi sobre seis radianes. Para todas las vueltas se añade más dos k pi."
   };
 }
 
@@ -463,37 +414,32 @@ function generateCheapTravelPlan(query) {
   return {
     text: `✈️ **Plan de Viaje Ultra Económico a ${city} (3 Días):**
 
-### 1. Vuelos y Transporte (Gasto: 35€ - 55€)
-• **Vuelos:** Usa Google Flights en modo incógnito; viaja martes o miércoles con equipaje de mano en Ryanair o Wizz Air.
-• **Transporte local:** Evita taxis. Compra el bono de transporte público ilimitado de 72 horas (18€) o muévete caminando.
+### 1. Vuelos y Transporte (35€ - 55€)
+• Vuelos: Reserva en Google Flights en modo incógnito viajando martes o miércoles con equipaje de mano en Ryanair o Wizz Air.
+• Transporte local: Compra el abono de transporte público de 72 horas (18€) o muévete caminando.
 
 ### 2. Alojamiento Barato (20€ - 25€ / noche)
-• Reserva una cama en habitación compartida en albergues valorados con +8 en **Hostelworld** (ej: The YellowSquare o Generator) o en un Airbnb compartido cerca de una boca de metro.
+• Reserva en albergues valorados con +8 en **Hostelworld** (ej: The YellowSquare o Generator) o en habitaciones compartidas cerca del metro.
 
-### 3. Comida Rica y Económica (12€ - 15€ / día)
-• **Desayuno:** Café y croissant en barra en panaderías de barrio (2,50€).
-• **Almuerzo:** Pizza al corte al peso o panini gourmet tradicional (4€ - 5€).
-• **Cena:** Compra en supermercados locales o menús de día económicos.
+### 3. Comida Barata y Rica (12€ - 15€ / día)
+• Desayuno: Café y bollo en panaderías locales en barra (2,50€).
+• Almuerzo: Pizza al corte al peso o panini tradicional (4€ - 5€).
+• Cena: Compra en supermercados locales o menús de día económicos.
 
-### 4. Qué Ver 100% Gratis
-• Día 1: Recorre las plazas históricas y monumentos al aire libre.
-• Día 2: Visita las basílicas e iglesias principales (entrada gratuita con arte de Miguel Ángel y Caravaggio).
-• Día 3: Miradores panorámicos públicos para ver el atardecer sin pagar entradas caras.
-
-💰 **Presupuesto total estimado para los 3 días:** **140€ - 165€** con todo incluido.`,
-    speechText: `Para viajar ultra económico a ${city}, viaja entre semana con equipaje de mano, quédate en albergues por veinte euros la noche y come en panaderías locales. El viaje de tres días te sale por unos ciento cincuenta euros en total.`
+💰 **Presupuesto total estimado para los 3 días:** **140€ - 165€** todo incluido.`,
+    speechText: `Para viajar a ${city} de la forma más barata, viaja un martes o miércoles con equipaje de mano en aerolíneas low cost, alójate en un albergue por veinte euros la noche y come pizza al corte y productos de supermercado por quince euros al día. El viaje completo de tres días te sale por unos ciento cincuenta euros.`
   };
 }
 
 // Respuestas Directas Locales
-function getDirectKnowledgeAnswer(query, lang) {
+function getDirectKnowledgeAnswer(query) {
   const q = query.toLowerCase().trim();
 
   // Ciencia
   if (q.includes('cielo es azul') || q.includes('cielo azul')) {
     return {
-      text: `El cielo se ve azul debido a la **dispersión de Rayleigh**:\n\n• La luz del Sol viaja con todos los colores del espectro combinados.\n• Al entrar en la atmósfera, choca contra las moléculas de nitrógeno y oxígeno.\n• La luz azul viaja en ondas cortas y se dispersa en todas direcciones unas 10 veces más que la luz roja.\n• Como nuestros ojos son más sensibles a las longitudes de onda azules, vemos la cúpula celeste de color azul durante el día.`,
-      speechText: "El cielo se ve azul debido a la dispersión de Rayleigh: la luz azul tiene ondas más cortas y se dispersa en la atmósfera mucho más que otros colores."
+      text: `El cielo se ve azul debido a la **dispersión de Rayleigh**:\n\n• La luz del Sol contiene todos los colores del espectro combinados.\n• Al entrar en la atmósfera, choca contra las moléculas de nitrógeno y oxígeno.\n• La luz azul viaja en ondas cortas y se dispersa en todas direcciones unas 10 veces más que la luz roja.\n• Por eso vemos la cúpula celeste de color azul durante el día.`,
+      speechText: "El cielo se ve azul debido a la dispersión de Rayleigh: la luz del sol choca contra las moléculas de nitrógeno y oxígeno de la atmósfera, y como la luz azul viaja en ondas más cortas, se dispersa en todas direcciones diez veces más que la luz roja."
     };
   }
 
@@ -536,14 +482,14 @@ function getDirectKnowledgeAnswer(query, lang) {
   // Saludos
   if (q.includes('hola') || q.includes('buenas') || q.includes('qué tal') || q.includes('que tal')) {
     return {
-      text: `¡Hola! ¿Qué necesitas resolver hoy? Pregúntame sobre matemáticas, viajes, ciencia, creación de documentos en PDF o citas en tu calendario.`,
-      speechText: "¡Hola! ¿Qué necesitas resolver hoy? Estoy listo para responderte."
+      text: `¡Hola! ¿Qué necesitas resolver hoy? Pregúntame sobre matemáticas, viajes, ciencia o pídeme lo que quieras.`,
+      speechText: "¡Hola! ¿Qué necesitas resolver hoy? Estoy listo para responderte con mi voz en castellano."
     };
   }
 
   return {
-    text: `Aquí tienes la información sobre **${escapeHtml(query)}**:\n\n• **Solución directa:** Para abordar este problema con efectividad, establece el objetivo concreto y ejecuta el primer paso práctico.\n• **Opciones:** Puedo redactarte el informe en **PDF** o prepararte una estructura para **Canva**.\n\nDime qué detalle adicional necesitas.`,
-    speechText: `Sobre tu consulta, puedo darte los pasos exactos o generar un PDF si lo necesitas.`
+    text: `Aquí tienes la solución directa sobre **${escapeHtml(query)}**:\n\n• **Explicación:** Aborda la cuestión analizando los datos principales y aplicando la fórmula o paso correspondiente.\n• **Opciones:** Puedo redactarte un documento en **PDF** si lo necesitas.`,
+    speechText: `Sobre tu consulta, aquí tienes los pasos y datos directos. Dime si quieres profundizar en algo más.`
   };
 }
 
@@ -552,17 +498,17 @@ async function handleUserSubmit(text, fromVoice = false) {
   if (!text.trim()) return;
   if (elements.welcomeScreen) elements.welcomeScreen.remove();
 
-  // Desbloquear audio en el envío
-  unlockSafariAudio();
-
   appendMessageBubble('user', text, fromVoice);
   elements.chatInput.value = '';
 
   const thinkId = 'think_' + Date.now();
   appendThinkingBubble(thinkId);
 
-  const aiOutput = await fetchRealAiResponse(text, state.language);
+  const aiOutput = await fetchRealAiResponse(text);
   replaceThinkingBubble(thinkId, aiOutput);
+
+  // Reproducir voz en castellano
+  speakSpanishVoice(aiOutput.speechText || aiOutput.text);
 }
 
 function appendMessageBubble(sender, text, isVoice = false) {
@@ -619,16 +565,6 @@ function replaceThinkingBubble(id, aiOutput) {
     `;
   }
 
-  if (aiOutput.canvaAction) {
-    actionButtonsHtml += `
-      <div class="mt-3 pt-3 border-t border-slate-800 flex items-center gap-2">
-        <a href="https://www.canva.com" target="_blank" class="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md transition-colors">
-          <i data-lucide="external-link" class="w-3.5 h-3.5"></i> Abrir en Canva
-        </a>
-      </div>
-    `;
-  }
-
   if (aiOutput.calendarAction) {
     const googleCalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(aiOutput.calendarTitle)}`;
     actionButtonsHtml += `
@@ -653,12 +589,12 @@ function replaceThinkingBubble(id, aiOutput) {
         ${actionButtonsHtml}
       </div>
       <div class="flex items-center gap-3 mt-1.5 px-1 text-[11px] text-slate-500">
-        <button data-speak-msg="${encodeURIComponent(aiOutput.speechText || aiOutput.text)}" class="hover:text-sky-400 transition-colors flex items-center gap-1">
-          <i data-lucide="volume-2" class="w-3 h-3"></i> Escuchar voz
+        <button data-speak-msg="${encodeURIComponent(aiOutput.speechText || aiOutput.text)}" class="hover:text-sky-400 transition-colors flex items-center gap-1 text-sky-400 font-medium">
+          <i data-lucide="volume-2" class="w-3.5 h-3.5"></i> Reproducir voz de nuevo
         </button>
         <span>•</span>
         <button data-copy-msg="${encodeURIComponent(aiOutput.text)}" class="hover:text-slate-300 transition-colors flex items-center gap-1">
-          <i data-lucide="copy" class="w-3 h-3"></i> Copiar
+          <i data-lucide="copy" class="w-3.5 h-3.5"></i> Copiar
         </button>
       </div>
     </div>
@@ -667,14 +603,12 @@ function replaceThinkingBubble(id, aiOutput) {
   el.replaceWith(div);
   refreshIcons();
 
-  // Renderizar fórmulas matemáticas con KaTeX en la burbuja recién creada
   renderMathFormulas(div.querySelector('.math-content'));
 
   const speakBtn = div.querySelector('[data-speak-msg]');
   if (speakBtn) {
     speakBtn.addEventListener('click', () => {
-      unlockSafariAudio();
-      speakHumanVoice(decodeURIComponent(speakBtn.getAttribute('data-speak-msg')), state.language);
+      speakSpanishVoice(decodeURIComponent(speakBtn.getAttribute('data-speak-msg')));
     });
   }
 
@@ -794,7 +728,6 @@ elements.chatForm.addEventListener('submit', (e) => {
 
 // Single tap mic for text dictation
 elements.micBtn.addEventListener('click', () => {
-  unlockSafariAudio();
   if (state.isRecording) {
     stopSpeechRecognizer();
   } else {
@@ -806,37 +739,26 @@ elements.micBtn.addEventListener('click', () => {
   }
 });
 
-// Live Voice Mode button bindings (Garantizado para iPhone y escritorio)
+// Botón MODO VOZ (Al lado de Enviar)
 if (elements.openLiveVoiceBtn) {
-  elements.openLiveVoiceBtn.addEventListener('click', (e) => {
-    openLiveVoiceModal(e);
-  });
-  elements.openLiveVoiceBtn.addEventListener('touchend', (e) => {
-    openLiveVoiceModal(e);
-  });
+  elements.openLiveVoiceBtn.addEventListener('click', openLiveVoiceModal);
+  elements.openLiveVoiceBtn.addEventListener('touchend', openLiveVoiceModal);
 }
 
 if (elements.closeLiveVoiceBtn) {
-  elements.closeLiveVoiceBtn.addEventListener('click', (e) => {
-    closeLiveVoiceModal(e);
-  });
-  elements.closeLiveVoiceBtn.addEventListener('touchend', (e) => {
-    closeLiveVoiceModal(e);
-  });
+  elements.closeLiveVoiceBtn.addEventListener('click', closeLiveVoiceModal);
+  elements.closeLiveVoiceBtn.addEventListener('touchend', closeLiveVoiceModal);
 }
 
-// Botón manual de reproducir voz en el modal
 if (elements.manualSpeakBtn) {
   elements.manualSpeakBtn.addEventListener('click', () => {
-    unlockSafariAudio();
-    if (state.lastAiAnswerText) {
-      speakHumanVoice(state.lastAiAnswerText, state.language);
+    if (state.lastAiSpeechText) {
+      speakSpanishVoice(state.lastAiSpeechText);
     }
   });
 }
 
 elements.toggleVoiceCallMicBtn.addEventListener('click', () => {
-  unlockSafariAudio();
   if (state.isRecording) {
     stopSpeechRecognizer();
     elements.callMicIcon.classList.replace('text-sky-400', 'text-red-400');
@@ -846,39 +768,9 @@ elements.toggleVoiceCallMicBtn.addEventListener('click', () => {
   }
 });
 
-elements.langSelect.addEventListener('change', (e) => {
-  state.language = e.target.value;
-  if (state.recognition) state.recognition.lang = state.language;
-});
-
 elements.clearChatBtn.addEventListener('click', () => {
   location.reload();
 });
-
-// Tool Buttons
-elements.toolBtns.forEach(btn => {
-  btn.addEventListener('click', () => {
-    unlockSafariAudio();
-    const act = btn.getAttribute('data-quick-action');
-    if (act === 'trig') handleUserSubmit('Resuélveme la ecuación trigonométrica 2 sen(x) - 1 = 0 con todos sus pasos y símbolos matemáticos');
-    if (act === 'travel') handleUserSubmit('Planifícame un viaje de 3 días lo más barato posible a Roma con presupuesto exacto');
-    if (act === 'pdf') handleUserSubmit('Genera un informe oficial para descargar en formato PDF');
-    if (act === 'canva') handleUserSubmit('Diseña una presentación estilo Canva para mí');
-    if (act === 'calendar') handleUserSubmit('Agenda una cita en mi calendario personal para mañana');
-  });
-});
-
-elements.promptCards.forEach(card => {
-  card.addEventListener('click', () => {
-    unlockSafariAudio();
-    const p = card.getAttribute('data-prompt');
-    if (p) handleUserSubmit(p);
-  });
-});
-
-// Desbloquear audio en el primer toque de la pantalla
-document.addEventListener('touchstart', unlockSafariAudio, { once: true });
-document.addEventListener('click', unlockSafariAudio, { once: true });
 
 window.addEventListener('DOMContentLoaded', () => {
   initVoices();
