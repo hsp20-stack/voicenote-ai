@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>VoiceNote AI - Asistente Inteligente por Voz y Texto</title>
-  <meta name="description" content="Asistente de inteligencia artificial conversacional por voz y texto al estilo ChatGPT y Claude. Desarrollada por Hugo SP Studios.">
+  <title>VoiceNote AI - Asistente Conversacional Universal</title>
+  <meta name="description" content="IA conversacional por voz y texto al estilo Copilot y ChatGPT. Habla con voz humana en 4 idiomas, genera PDFs y agenda citas. Desarrollada por Hugo SP Studios.">
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#090d16">
+  <meta name="theme-color" content="#0369a1">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="icon" type="image/png" href="icon.png">
 
@@ -19,9 +19,23 @@
         extend: {
           colors: {
             brand: {
-              500: '#6366f1',
-              600: '#4f46e5',
-              700: '#4338ca',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+            }
+          },
+          animation: {
+            'orb-pulse': 'orbPulse 3s ease-in-out infinite',
+            'orb-glow': 'orbGlow 2s ease-in-out infinite',
+          },
+          keyframes: {
+            orbPulse: {
+              '0%, 100%': { transform: 'scale(1)', opacity: '0.85' },
+              '50%': { transform: 'scale(1.12)', opacity: '1' },
+            },
+            orbGlow: {
+              '0%, 100%': { filter: 'drop-shadow(0 0 35px rgba(56, 189, 248, 0.5))' },
+              '50%': { filter: 'drop-shadow(0 0 65px rgba(14, 165, 233, 0.9))' },
             }
           }
         }
@@ -30,164 +44,212 @@
   </script>
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- jsPDF CDN para generar PDFs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body class="bg-[#070a12] text-slate-100 min-h-screen flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
+<body class="bg-[#0b1329] text-slate-100 min-h-screen flex flex-col font-sans selection:bg-sky-500 selection:text-white">
 
-  <!-- Header Superior Fijo -->
-  <header class="border-b border-slate-800/80 bg-[#070a12]/90 backdrop-blur-md sticky top-0 z-40">
+  <!-- Header Superior -->
+  <header class="border-b border-sky-950/80 bg-[#0b1329]/90 backdrop-blur-md sticky top-0 z-40">
     <div class="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
       <div class="flex items-center gap-2.5">
-        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-500/30">
-          <i data-lucide="sparkles" class="w-4 h-4 text-white"></i>
+        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-600 to-blue-500 flex items-center justify-center shadow-md shadow-sky-500/30">
+          <i data-lucide="bot" class="w-5 h-5 text-white"></i>
         </div>
         <div>
-          <div class="flex items-center gap-1.5">
+          <div class="flex items-center gap-2">
             <span class="font-extrabold text-sm sm:text-base tracking-tight text-white">VoiceNote AI</span>
-            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">PRO</span>
+            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">COPILOT</span>
           </div>
         </div>
       </div>
 
       <div class="flex items-center gap-2">
-        <!-- Interruptor para que la IA hable en voz alta -->
-        <button id="toggleVoiceResponseBtn" class="px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-800 text-[11px] font-medium text-slate-400 hover:text-white transition-all flex items-center gap-1.5" title="Activar voz de la IA">
-          <i id="voiceResponseIcon" data-lucide="volume-2" class="w-3.5 h-3.5 text-indigo-400"></i>
-          <span class="hidden sm:inline">Voz IA</span>
+        <!-- Botón Modo Voz Copilot (Conversación Continua) -->
+        <button id="openCopilotVoiceBtn" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-lg shadow-sky-500/25 active:scale-95 transition-all">
+          <i data-lucide="mic" class="w-3.5 h-3.5 animate-pulse"></i>
+          <span>Modo Voz Copilot</span>
         </button>
 
-        <!-- Limpiar Conversación -->
-        <button id="clearChatBtn" class="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-red-400 transition-colors" title="Borrar chat">
-          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-        </button>
+        <!-- Selector de Idioma -->
+        <select id="langSelect" class="bg-slate-900 border border-slate-800 text-xs rounded-xl px-2.5 py-1.5 text-slate-300 focus:outline-none focus:border-sky-500 transition-colors">
+          <option value="es-ES">🇪🇸 Español</option>
+          <option value="fr-FR">🇫🇷 Français</option>
+          <option value="pt-BR">🇧🇷 Português</option>
+          <option value="zh-CN">🇨🇳 中文</option>
+        </select>
 
-        <!-- Configuración -->
-        <button id="openSettingsBtn" class="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors" title="Configurar IA">
-          <i data-lucide="settings" class="w-3.5 h-3.5"></i>
+        <!-- Limpiar Chat -->
+        <button id="clearChatBtn" class="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors" title="Nueva conversación">
+          <i data-lucide="plus" class="w-4 h-4"></i>
         </button>
       </div>
     </div>
   </header>
 
-  <!-- Área Principal de Conversación (Chat Feed) -->
-  <main class="flex-1 max-w-4xl w-full mx-auto px-4 py-6 flex flex-col justify-between">
-    
-    <!-- Feed de Mensajes -->
-    <div id="chatMessages" class="flex-1 space-y-4 overflow-y-auto pb-4">
-      
-      <!-- Mensaje de Bienvenida -->
-      <div class="text-center py-8 sm:py-12 space-y-3">
-        <div class="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center shadow-xl shadow-indigo-500/20">
-          <i data-lucide="bot" class="w-7 h-7 text-white"></i>
-        </div>
-        <h1 class="text-xl sm:text-2xl font-bold text-white tracking-tight">¿En qué puedo ayudarte hoy?</h1>
-        <p class="text-xs sm:text-sm text-slate-400 max-w-md mx-auto">
-          Habla conmigo por micrófono o escribe lo que necesites. Organizo tus tareas, redacto correos o resuelvo cualquier duda como ChatGPT.
-        </p>
-
-        <!-- Botones de Acción Rápida (Sugerencias) -->
-        <div class="flex flex-wrap justify-center gap-2 pt-4 max-w-xl mx-auto">
-          <button data-quick-prompt="Organiza las tareas que tengo pendientes para hoy y dame un plan" class="quick-btn text-xs bg-slate-900/80 hover:bg-slate-800 border border-slate-800/80 text-slate-300 hover:text-white px-3 py-2 rounded-xl transition-all flex items-center gap-1.5">
-            📋 <span>Organizar mi día</span>
-          </button>
-          <button data-quick-prompt="Redacta un correo formal y profesional para un cliente" class="quick-btn text-xs bg-slate-900/80 hover:bg-slate-800 border border-slate-800/80 text-slate-300 hover:text-white px-3 py-2 rounded-xl transition-all flex items-center gap-1.5">
-            ✉️ <span>Redactar un correo</span>
-          </button>
-          <button data-quick-prompt="Dame 3 ideas de negocios digitales con IA muy rentables" class="quick-btn text-xs bg-slate-900/80 hover:bg-slate-800 border border-slate-800/80 text-slate-300 hover:text-white px-3 py-2 rounded-xl transition-all flex items-center gap-1.5">
-            💡 <span>Ideas con IA</span>
-          </button>
-          <button data-quick-prompt="¿Cuáles son los hábitos diarios más productivos?" class="quick-btn text-xs bg-slate-900/80 hover:bg-slate-800 border border-slate-800/80 text-slate-300 hover:text-white px-3 py-2 rounded-xl transition-all flex items-center gap-1.5">
-            🧠 <span>Consejos de éxito</span>
-          </button>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- Barra de Estado / Onda de Grabación cuando el micrófono está activo -->
-    <div id="recordingWaveBar" class="hidden my-2 p-3 rounded-2xl bg-indigo-950/60 border border-indigo-500/30 flex items-center justify-between gap-3 animate-pulse">
-      <div class="flex items-center gap-2.5">
-        <span class="w-3 h-3 rounded-full bg-red-500 animate-ping"></span>
-        <span class="text-xs font-semibold text-red-400">Escuchándote...</span>
-        <span id="recordingTimer" class="text-xs font-mono text-slate-300 font-bold">00:00</span>
-      </div>
-      <!-- Botón de parada rápida -->
-      <button id="cancelRecordBtn" class="px-3 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 text-xs font-medium border border-red-500/40 transition-colors flex items-center gap-1">
-        <i data-lucide="square" class="w-3 h-3"></i> Detener y enviar
+  <!-- Barra de Herramientas Rápidas -->
+  <div class="border-b border-sky-950/60 bg-[#080d1d]/60 py-2 px-4 overflow-x-auto">
+    <div class="max-w-4xl mx-auto flex items-center gap-2 text-xs">
+      <span class="text-slate-400 text-[11px] font-semibold uppercase tracking-wider hidden sm:inline">Herramientas:</span>
+      <button data-quick-action="pdf" class="tool-btn px-2.5 py-1 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5 flex-shrink-0 transition-colors">
+        <i data-lucide="file-down" class="w-3.5 h-3.5 text-rose-400"></i> Crear PDF
+      </button>
+      <button data-quick-action="canva" class="tool-btn px-2.5 py-1 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5 flex-shrink-0 transition-colors">
+        <i data-lucide="palette" class="w-3.5 h-3.5 text-cyan-400"></i> Diseños / Canva
+      </button>
+      <button data-quick-action="calendar" class="tool-btn px-2.5 py-1 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5 flex-shrink-0 transition-colors">
+        <i data-lucide="calendar" class="w-3.5 h-3.5 text-amber-400"></i> Agendar Cita
+      </button>
+      <button data-quick-action="recommend" class="tool-btn px-2.5 py-1 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5 flex-shrink-0 transition-colors">
+        <i data-lucide="sparkles" class="w-3.5 h-3.5 text-sky-400"></i> Recomendaciones
       </button>
     </div>
+  </div>
 
-    <!-- Barra de Entrada Inferior (Texto + Micrófono) -->
-    <div class="sticky bottom-0 pt-2 pb-1 bg-[#070a12]/95 backdrop-blur-md">
-      <form id="chatForm" class="relative flex items-center gap-2 bg-slate-900/90 border border-slate-800 focus-within:border-indigo-500/80 rounded-2xl p-1.5 transition-all shadow-xl">
+  <!-- Contenedor Principal de Chat -->
+  <main class="flex-1 max-w-4xl w-full mx-auto px-4 py-4 flex flex-col justify-between">
+    
+    <!-- Feed de Conversación -->
+    <div id="chatMessages" class="flex-1 space-y-4 overflow-y-auto pb-4">
+      
+      <!-- Portada de Bienvenida -->
+      <div id="welcomeScreen" class="text-center py-10 sm:py-16 space-y-4">
+        <div class="w-16 h-16 mx-auto rounded-3xl bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center shadow-2xl shadow-sky-500/30 ring-4 ring-sky-500/20">
+          <i data-lucide="bot" class="w-8 h-8 text-white"></i>
+        </div>
+        <div>
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">VoiceNote AI</h1>
+          <p class="text-xs sm:text-sm text-slate-400 max-w-md mx-auto mt-1">
+            Tu asistente inteligente por voz y texto. Háblame de forma natural como con Copilot o escríbeme cualquier pregunta.
+          </p>
+        </div>
+
+        <!-- Botón Gran Llamada Modo Voz -->
+        <div class="pt-2">
+          <button id="heroVoiceBtn" class="px-5 py-3 rounded-2xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-bold text-sm shadow-xl shadow-sky-600/30 flex items-center gap-2.5 mx-auto active:scale-95 transition-all">
+            <i data-lucide="mic" class="w-5 h-5"></i>
+            <span>Iniciar Conversación por Voz (Estilo Copilot)</span>
+          </button>
+        </div>
+
+        <!-- Tarjetas de Sugerencias -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-lg mx-auto pt-4 text-left">
+          <button data-prompt="Cuéntame una historia divertida y dame un consejo de vida" class="prompt-card p-3 rounded-2xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 text-xs text-slate-300 hover:text-white transition-all flex items-start gap-2.5">
+            <span class="text-lg">💬</span>
+            <div>
+              <strong class="block text-slate-200">Conversar de cualquier tema</strong>
+              <span class="text-[11px] text-slate-500">Respuestas reales y humanas</span>
+            </div>
+          </button>
+
+          <button data-prompt="Recomiéndame 3 destinos de viaje increíbles y económicos" class="prompt-card p-3 rounded-2xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 text-xs text-slate-300 hover:text-white transition-all flex items-start gap-2.5">
+            <span class="text-lg">✈️</span>
+            <div>
+              <strong class="block text-slate-200">Recomendaciones personalizadas</strong>
+              <span class="text-[11px] text-slate-500">Viajes, libros, películas y más</span>
+            </div>
+          </button>
+
+          <button data-prompt="Agenda una cita de dentista el próximo lunes a las 11:30" class="prompt-card p-3 rounded-2xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 text-xs text-slate-300 hover:text-white transition-all flex items-start gap-2.5">
+            <span class="text-lg">📅</span>
+            <div>
+              <strong class="block text-slate-200">Agendar en mi calendario</strong>
+              <span class="text-[11px] text-slate-500">Google Calendar o Apple Calendar</span>
+            </div>
+          </button>
+
+          <button data-prompt="Redacta un informe ejecutivo sobre tecnología y prepáralo en PDF" class="prompt-card p-3 rounded-2xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 text-xs text-slate-300 hover:text-white transition-all flex items-start gap-2.5">
+            <span class="text-lg">📄</span>
+            <div>
+              <strong class="block text-slate-200">Crear y Descargar PDF</strong>
+              <span class="text-[11px] text-slate-500">Documento listo en 1 segundo</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Barra de Entrada Inferior -->
+    <div class="sticky bottom-0 pt-2 pb-1 bg-[#0b1329]/95 backdrop-blur-md">
+      <form id="chatForm" class="relative flex items-center gap-2 bg-slate-900/90 border border-slate-800 focus-within:border-sky-500/80 rounded-2xl p-1.5 shadow-xl transition-all">
         
-        <!-- Botón de Micrófono Principal (Hablar) -->
-        <button type="button" id="micBtn" class="w-10 h-10 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center transition-all flex-shrink-0 shadow-md shadow-indigo-600/30 active:scale-95" title="Hablar por voz">
+        <!-- Botón de Micrófono Rápido -->
+        <button type="button" id="micBtn" class="w-10 h-10 rounded-xl bg-sky-600 hover:bg-sky-500 text-white flex items-center justify-center transition-all flex-shrink-0 shadow-md shadow-sky-600/30 active:scale-95" title="Hablar por voz">
           <i id="micIcon" data-lucide="mic" class="w-5 h-5"></i>
         </button>
 
-        <!-- Campo de Texto para Escribir -->
-        <input type="text" id="chatInput" placeholder="Escribe un mensaje o pulsa el micro..." autocomplete="off" class="flex-1 bg-transparent px-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none">
+        <!-- Campo de Texto -->
+        <input type="text" id="chatInput" placeholder="Escribe lo que quieras o pulsa el micro..." autocomplete="off" class="flex-1 bg-transparent px-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none">
 
-        <!-- Botón Enviar Texto -->
-        <button type="submit" id="sendBtn" class="w-9 h-9 rounded-xl bg-slate-800 hover:bg-indigo-600 text-slate-400 hover:text-white flex items-center justify-center transition-all flex-shrink-0">
-          <i data-lucide="arrow-up" class="w-4 h-4"></i>
+        <!-- Botón Enviar -->
+        <button type="submit" id="sendBtn" class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-sky-600 text-slate-400 hover:text-white flex items-center justify-center transition-all flex-shrink-0 active:scale-95">
+          <i data-lucide="arrow-up" class="w-5 h-5"></i>
         </button>
       </form>
 
-      <!-- Pie de Página Oficial Hugo SP Studios -->
-      <footer class="mt-4 pb-2 text-center text-xs">
+      <!-- Pie de Página Oficial -->
+      <footer class="mt-3 pb-1 text-center text-xs">
         <div class="flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-          <span>VoiceNote AI • Desarrollada por <strong class="text-indigo-400">Hugo SP Studios</strong></span>
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>Desarrollada por <strong class="text-sky-400">Hugo SP Studios</strong></span>
         </div>
       </footer>
     </div>
 
   </main>
 
-  <!-- Modal de Configuración (API & Idioma) -->
-  <div id="settingsModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl relative">
-      <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
-        <h3 class="text-base font-bold text-white flex items-center gap-2">
-          <i data-lucide="sliders" class="w-4 h-4 text-indigo-400"></i> Configuración del Asistente
-        </h3>
-        <button id="closeSettingsBtn" class="p-1 rounded-lg text-slate-400 hover:text-white">
-          <i data-lucide="x" class="w-4 h-4"></i>
-        </button>
+  <!-- ========================================== -->
+  <!-- MODAL INMERSIVO: MODO VOZ COPILOT (EN DIRECTO) -->
+  <!-- ========================================== -->
+  <div id="copilotVoiceModal" class="fixed inset-0 z-50 bg-[#070d1e]/98 backdrop-blur-2xl flex flex-col justify-between items-center p-6 hidden">
+    
+    <!-- Barra Superior del Modo Voz -->
+    <div class="w-full max-w-md flex items-center justify-between text-xs text-slate-400">
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+        <span class="font-semibold text-slate-200">Modo Voz Copilot en Vivo</span>
+      </div>
+      <span id="voiceLanguageTag" class="px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 text-[10px] font-bold border border-sky-500/30">ESPAÑOL</span>
+    </div>
+
+    <!-- Centro: Esfera Holográfica Flotante (Orbe Copilot) -->
+    <div class="flex flex-col items-center justify-center my-auto relative">
+      <!-- Orbe Animado -->
+      <div id="voiceOrb" class="w-48 h-48 sm:w-56 sm:h-56 rounded-full bg-gradient-to-tr from-sky-500 via-blue-600 to-cyan-400 animate-orb-pulse animate-orb-glow flex items-center justify-center relative cursor-pointer shadow-2xl transition-all">
+        <!-- Núcleo interior del orbe -->
+        <div class="w-36 h-36 sm:w-44 sm:h-44 rounded-full bg-gradient-to-bl from-cyan-300 via-sky-400 to-blue-700 opacity-90 blur-sm flex items-center justify-center">
+          <i id="orbCenterIcon" data-lucide="mic" class="w-12 h-12 text-white"></i>
+        </div>
       </div>
 
-      <div class="space-y-4 text-xs text-slate-300">
-        <div>
-          <label class="block font-semibold mb-1 text-slate-200">Motor de Inteligencia Artificial</label>
-          <select id="aiModelSelect" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500">
-            <option value="builtin">Motor Inteligente Integrado (Gratis, Sin Claves, Inmediato)</option>
-            <option value="gemini">Google Gemini Flash / Pro (Potencia Total LLM)</option>
-          </select>
-          <p class="text-[11px] text-slate-500 mt-1">El motor integrado responde de inmediato sin consumir datos ni requerir cuentas.</p>
-        </div>
+      <!-- Estado en tiempo real -->
+      <p id="voiceStatusText" class="mt-8 text-base font-bold text-sky-300 tracking-wide">
+        Te estoy escuchando, habla conmigo...
+      </p>
 
-        <div id="apiKeySection" class="hidden">
-          <label class="block font-semibold mb-1 text-slate-200">Google Gemini API Key (Opcional)</label>
-          <input type="password" id="geminiKeyInput" placeholder="AIzaSy..." class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs focus:outline-none focus:border-indigo-500">
-        </div>
-
-        <div>
-          <label class="block font-semibold mb-1 text-slate-200">Idioma de Reconocimiento y Voz</label>
-          <select id="langSelect" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-indigo-500">
-            <option value="es-ES">🇪🇸 Español</option>
-            <option value="en-US">🇺🇸 English</option>
-          </select>
-        </div>
-
-        <div class="pt-4 border-t border-slate-800 flex justify-end">
-          <button id="saveSettingsBtn" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition-colors">
-            Guardar
-          </button>
-        </div>
+      <!-- Subtítulo en tiempo real de lo que hablas -->
+      <div class="mt-3 max-w-sm text-center px-4">
+        <p id="voiceTranscriptPreview" class="text-xs sm:text-sm text-slate-300 font-medium italic min-h-[40px] leading-relaxed">
+          "Di lo que quieras, te responderé en directo con voz humana..."
+        </p>
       </div>
     </div>
+
+    <!-- Barra Inferior de Control de la Llamada -->
+    <div class="w-full max-w-md flex items-center justify-center gap-6 pb-6">
+      <!-- Botón Pausar / Hablar -->
+      <button id="toggleVoiceCallMicBtn" class="w-14 h-14 rounded-full bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center shadow-lg border border-slate-700 active:scale-95 transition-all">
+        <i id="callMicIcon" data-lucide="mic" class="w-6 h-6 text-sky-400"></i>
+      </button>
+
+      <!-- Botón Colgar / Salir del modo voz -->
+      <button id="closeCopilotVoiceBtn" class="w-14 h-14 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center shadow-xl shadow-red-600/30 active:scale-95 transition-all" title="Finalizar llamada">
+        <i data-lucide="phone-off" class="w-6 h-6"></i>
+      </button>
+    </div>
+
   </div>
 
   <script src="app.js"></script>
