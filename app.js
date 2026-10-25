@@ -260,11 +260,39 @@ async function handleVoiceExchange(userText) {
   speakSpanishVoice(aiResult.speechText || aiResult.text);
 }
 
-// MOTOR DE IA UNIVERSAL (Sabe de absolutamente todo)
+// =====================================================
+// MOTOR DE IA INTELIGENTE Y ROBUSTO
+// =====================================================
 async function fetchRealAiResponse(query) {
   const cleanQ = query.trim();
   const lower  = cleanQ.toLowerCase();
 
+  // 1. Resolver matemáticas básicas al instante (ej: 2 + 2, 5 * 4, cuanto es...)
+  if (lower.includes('cuanto es') || lower.includes('cuánto es') || /[\d]+\s*[\+\-\*\/]\s*[\d]+/.test(lower)) {
+    try {
+      const mathExpr = cleanQ.replace(/[^0-9\+\-\*\/\.\(\)]/g, '');
+      if (mathExpr) {
+        const result = Function('"use strict";return (' + mathExpr + ')')();
+        if (!isNaN(result)) {
+          const exprFormatted = mathExpr.replace('+', ' más ').replace('-', ' menos ').replace('*', ' por ').replace('/', ' entre ');
+          return {
+            text: `🔢 **Resultado Matemático:**\n\n$$${mathExpr} = ${result}$$`,
+            speechText: `El resultado de ${exprFormatted} es ${result}.`
+          };
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 2. Saludos
+  if (lower.includes('hola') || lower.includes('buenas')) {
+    return {
+      text: '¡Hola! Soy **VoiceNote AI**, tu asistente universal creado por Hugo SP Studios. ¿En qué te puedo ayudar hoy?',
+      speechText: '¡Hola! Soy VoiceNote AI, tu asistente. ¿En qué te puedo ayudar hoy?'
+    };
+  }
+
+  // 3. Acciones especiales (PDF)
   if (lower.includes('pdf') || lower.includes('descargar informe')) {
     return {
       text: `📄 **Documento Oficial Listo:**\n\n• **Título:** Informe Oficial VoiceNote AI\n• **Autor:** Hugo SP Studios\n• **Fecha:** ${new Date().toLocaleDateString()}\n\nPulsa abajo para descargarlo en PDF.`,
@@ -275,6 +303,7 @@ async function fetchRealAiResponse(query) {
     };
   }
 
+  // 4. Acciones especiales (Calendario)
   if (lower.includes('cita') || lower.includes('agenda') || lower.includes('reunión') ||
       lower.includes('calendario') || lower.includes('dentista') || lower.includes('médico')) {
     const title = lower.includes('dentista') ? 'Cita con el Dentista' :
@@ -287,14 +316,24 @@ async function fetchRealAiResponse(query) {
     };
   }
 
+  // 5. Consulta universal a la API mediante POST robusto
   try {
-    const promptCompleto = `Eres VoiceNote AI, un asistente experto creado por Hugo SP Studios. Responde siempre en castellano de España de forma detallada, clara, culta y útil a la siguiente consulta del usuario: ${cleanQ}`;
-    const encodedPrompt = encodeURIComponent(promptCompleto);
-
+    const systemPrompt = "Eres VoiceNote AI, un asistente experto creado por Hugo SP Studios. Responde siempre en castellano de España de forma detallada, clara, culta y útil.";
+    
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 20000);
+    const timer = setTimeout(() => controller.abort(), 15000);
 
-    const res = await fetch(`https://text.pollinations.ai/${encodedPrompt}?model=openai&seed=42`, {
+    const res = await fetch('https://text.pollinations.ai/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: cleanQ }
+        ],
+        model: 'openai',
+        seed: Math.floor(Math.random() * 10000)
+      }),
       signal: controller.signal
     });
 
@@ -302,7 +341,7 @@ async function fetchRealAiResponse(query) {
 
     if (res.ok) {
       const answer = await res.text();
-      if (answer && answer.trim().length > 3) {
+      if (answer && answer.trim().length > 3 && !answer.includes('Rate limit')) {
         const speechVersion = answer.trim()
           .replace(/\$\$[\s\S]*?\$\$/g, '')
           .replace(/\$[^$]*?\$/g, '')
@@ -314,9 +353,10 @@ async function fetchRealAiResponse(query) {
     }
   } catch (err) {}
 
+  // 6. Fallback inteligente si la red falla
   return {
-    text: `🌍 **VoiceNote AI:** ${cleanQ}\n\nAquí tienes la información detallada sobre este tema. Como asistente universal, puedo ayudarte con viajes, cruceros, ciencia, historia y cualquier otra consulta que tengas. ¿Qué más te gustaría saber?`,
-    speechText: `Te puedo ayudar con cualquier tema que necesites, desde viajes y cruceros hasta ciencia o historia. ¿Qué más te gustaría saber?`
+    text: `🌍 **VoiceNote AI:** Sobre **"${escapeHtml(cleanQ)}"**, te comento que como asistente universal puedo ayudarte con viajes, ciencia, historia, matemáticas y cualquier otra consulta. ¿Te gustaría que profundice en algún aspecto?`,
+    speechText: `Sobre ese tema, puedo ayudarte con explicaciones detalladas, ciencia, viajes o cultura general. ¿Qué te gustaría saber?`
   };
 }
 
