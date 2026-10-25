@@ -1,0 +1,17 @@
+{
+  "name": "VoiceNote AI - De Voz a Tareas",
+  "short_name": "VoiceNote AI",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#4f46e5",
+  "description": "Convierte notas de voz en tareas accionables y resúmenes estructurados al instante con IA.",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
