@@ -44,8 +44,6 @@
   </script>
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- Puter.js CDN para IA Gratuita en Cliente sin CORS -->
-  <script src="https://js.puter.com/v2/"></script>
   <!-- jsPDF CDN para generar PDFs -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   
@@ -287,41 +285,4 @@
 
   <!-- Modal de Configuración de IA -->
   <div id="settingsModal" class="fixed inset-0 z-50 bg-[#070d1e]/90 backdrop-blur-md flex items-center justify-center p-4 hidden">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-        <div class="flex items-center gap-2">
-          <i data-lucide="settings" class="w-5 h-5 text-sky-400"></i>
-          <h2 class="text-base font-bold text-white">Configuración del Asistente</h2>
-        </div>
-        <button id="closeSettingsBtn" class="text-slate-400 hover:text-white transition-colors">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-      </div>
-
-      <div class="space-y-3">
-        <label class="block text-xs font-semibold text-slate-300">
-          Clave de API de Google Gemini (Opcional, 100% gratuita)
-        </label>
-        <p class="text-[11px] text-slate-400 leading-relaxed">
-          Si la dejas en blanco, la app usará el motor libre en la nube. Con tu propia clave de Gemini obtendrás respuestas ultra rápidas, personalizadas y sin límites.
-        </p>
-        <input type="password" id="geminiApiKeyInput" placeholder="Pega aquí tu API Key (AIzaSy...)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-sky-500">
-        <div class="flex justify-between items-center text-[11px]">
-          <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="text-sky-400 hover:underline flex items-center gap-1">
-            <i data-lucide="external-link" class="w-3 h-3"></i> Obtener clave gratuita en Google
-          </a>
-          <span id="apiKeyStatus" class="text-slate-500 text-[10px]"></span>
-        </div>
-      </div>
-
-      <div class="pt-3 border-t border-slate-800 flex justify-end gap-2">
-        <button id="saveSettingsBtn" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold shadow-md transition-colors">
-          Guardar Ajustes
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <script src="app.js"></script>
-</body>
-</html>
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2
