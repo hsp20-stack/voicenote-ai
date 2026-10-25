@@ -281,7 +281,6 @@ function closeLiveVoiceModal(e) {
   elements.liveVoiceModal.style.display = 'none';
 }
 
-// Conversación por voz dentro del orbe
 async function handleVoiceExchange(userText) {
   if (!userText || state.isAiSpeaking) return;
   if (elements.welcomeScreen) elements.welcomeScreen.remove();
@@ -320,14 +319,25 @@ NO uses respuestas genéricas ni frases de relleno. Ve directo al contenido que 
   // 1. INTENTO 1: Google Gemini API (si el usuario la ha configurado en ⚙️)
   if (state.geminiApiKey) {
     try {
+      // Filtrar el historial para asegurar alternancia estricta user -> model (evita error 400 de Gemini)
+      const validContents = [];
+      let expectedRole = 'user';
+      for (const msg of state.conversationHistory) {
+        const r = (msg.role === 'user') ? 'user' : 'model';
+        if (r === expectedRole) {
+          validContents.push({ role: r, parts: [{ text: msg.content }] });
+          expectedRole = (expectedRole === 'user') ? 'model' : 'user';
+        }
+      }
+      if (validContents.length === 0 || validContents[validContents.length - 1].role !== 'user') {
+        validContents.push({ role: 'user', parts: [{ text: cleanQ }] });
+      }
+
       const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(state.geminiApiKey.trim())}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: state.conversationHistory.map(m => ({
-            role: m.role === 'user' ? 'user' : 'model',
-            parts: [{ text: m.content }]
-          })),
+          contents: validContents,
           systemInstruction: {
             parts: [{ text: systemPrompt }]
           }
@@ -341,429 +351,18 @@ NO uses respuestas genéricas ni frases de relleno. Ve directo al contenido que 
           state.conversationHistory.push({ role: 'assistant', content: geminiText.trim() });
           return createAiResultObject(geminiText.trim(), wantsPdf, wantsCalendar);
         }
+      } else {
+        const errJson = await geminiRes.json().catch(() => ({}));
+        const errDetails = errJson.error?.message || `Error ${geminiRes.status}`;
+        console.warn('Gemini API error:', errDetails);
+        return {
+          text: `⚠️ **Aviso de Gemini (${geminiRes.status}):**\n\n${errDetails}\n\n👉 Revisa la clave que pegaste en el icono de **Ajustes ⚙️** (arriba a la derecha).`,
+          speechText: 'Hubo un error con la clave de Gemini. Revisa la configuración.'
+        };
       }
     } catch (e) {
-      console.warn('Gemini API call failed, falling back to public engine:', e);
+      console.warn('Gemini network error:', e);
     }
   }
 
-  // 2. INTENTO 2: Pollinations Direct (Sin registro, 100% libre)
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 9000);
-
-    const promptText = `Eres VoiceNote AI de Hugo SP Studios. Responde en castellano de España, útil y directo: ${cleanQ}`;
-    const getRes = await fetch(`https://text.pollinations.ai/${encodeURIComponent(promptText)}`, { signal: controller.signal });
-    clearTimeout(timer);
-
-    if (getRes.ok) {
-      const answer = await getRes.text();
-      if (answer && answer.trim().length > 5 && !answer.includes('Rate limit')) {
-        state.conversationHistory.push({ role: 'assistant', content: answer.trim() });
-        return createAiResultObject(answer.trim(), wantsPdf, wantsCalendar);
-      }
-    }
-  } catch (err) {
-    console.warn('Pollinations fallback failed:', err.message);
-  }
-
-  // 3. INTENTO 3: Motor Local Inteligente
-  return getSmartLocalAnswer(cleanQ, wantsPdf, wantsCalendar);
-}
-
-function createAiResultObject(fullText, wantsPdf = false, wantsCalendar = false) {
-  const speechVersion = fullText
-    .replace(/\$\$[\s\S]*?\$\$/g, '')
-    .replace(/\$[^$]*?\$/g, '')
-    .replace(/[*_#•`\\]/g, '')
-    .replace(/\[(.*?)\]\(.*?\)/g, '$1')
-    .replace(/\n+/g, '. ')
-    .trim()
-    .slice(0, 450);
-
-  const result = {
-    text: fullText,
-    speechText: speechVersion
-  };
-
-  if (wantsPdf) {
-    result.pdfAction = true;
-    result.pdfTitle = 'Informe_VoiceNote_AI';
-    result.pdfContent = fullText;
-  }
-
-  if (wantsCalendar) {
-    result.calendarAction = true;
-    result.calendarTitle = fullText.slice(0, 45) || 'Evento de VoiceNote AI';
-  }
-
-  return result;
-}
-
-function getSmartLocalAnswer(query, wantsPdf = false, wantsCalendar = false) {
-  const q = query.toLowerCase().trim();
-
-  // Cálculos matemáticos dinámicos
-  const mathMatch = q.match(/(\d+[\.,]?\d*)\s*(\+|\-|\*|\/|x|por|entre|mas|menos|dividido)\s*(\d+[\.,]?\d*)/i);
-  if (mathMatch) {
-    const n1 = parseFloat(mathMatch[1].replace(',', '.'));
-    const op = mathMatch[2].toLowerCase();
-    const n2 = parseFloat(mathMatch[3].replace(',', '.'));
-    let r = 0;
-    if (op === '+' || op === 'mas')                         r = n1 + n2;
-    else if (op === '-' || op === 'menos')                  r = n1 - n2;
-    else if (op === '*' || op === 'x' || op === 'por')      r = n1 * n2;
-    else if (op === '/' || op === 'entre' || op === 'dividido') r = n2 !== 0 ? +(n1 / n2).toFixed(4) : 'Indefinido';
-
-    return createAiResultObject(`El resultado de su cálculo es:\n\n$$${n1} ${op} ${n2} = ${r}$$`, wantsPdf, wantsCalendar);
-  }
-
-  // Saludos cortos aislados
-  const isOnlyGreeting = /^(hola|buenas|buenos días|buenas tardes|buenas noches|qué tal|que tal|hey|ey)\b[\s!.?]*$/i.test(q);
-  if (isOnlyGreeting) {
-    const greetings = [
-      '¡Hola! ¿En qué puedo ayudarte hoy?',
-      '¡Hola! Estoy listo para escucharte o responder a tus preguntas.',
-      '¡Buenas! Dime qué necesitas y te ayudo al instante.'
-    ];
-    const picked = greetings[Math.floor(Math.random() * greetings.length)];
-    return createAiResultObject(picked, wantsPdf, wantsCalendar);
-  }
-
-  if (q.includes('quién eres') || q.includes('quien eres') || q.includes('quién te creó') || q.includes('quien te creo')) {
-    return createAiResultObject('Soy **VoiceNote AI**, tu asistente inteligente con voz en castellano, desarrollado por **Hugo SP Studios**.', wantsPdf, wantsCalendar);
-  }
-
-  if (q.includes('hora') || q.includes('fecha') || q.includes('qué día es') || q.includes('que dia es')) {
-    const now = new Date();
-    const hora = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-    const fecha = now.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    return createAiResultObject(`Hoy es **${fecha}** y son las **${hora}**.`, wantsPdf, wantsCalendar);
-  }
-
-  return {
-    text: `⚠️ **Aviso de Conexión:**\n\nNo he podido conectar con el servidor de inteligencia artificial en este momento.\n\n💡 **Solución recomendada:**\nPuedes pulsar en el botón de **Configuración ⚙️** (arriba a la derecha) e ingresar tu propia clave gratuita de **Google Gemini** para obtener respuestas inmediatas y garantizadas.`,
-    speechText: 'No he podido conectar con el servidor de inteligencia artificial. Revisa tu conexión a internet o pulsa en configuración para añadir tu clave gratuita de Gemini.'
-  };
-}
-
-// =====================================================
-// CHAT — Envío de mensajes escritos
-// =====================================================
-async function handleUserSubmit(text, fromVoice = false) {
-  if (!text.trim()) return;
-  if (elements.welcomeScreen) elements.welcomeScreen.remove();
-
-  appendMessageBubble('user', text, fromVoice);
-  elements.chatInput.value = '';
-
-  const thinkId = 'think_' + Date.now();
-  appendThinkingBubble(thinkId);
-
-  const aiOutput = await fetchRealAiResponse(text);
-  replaceThinkingBubble(thinkId, aiOutput);
-  speakSpanishVoice(aiOutput.speechText || aiOutput.text);
-}
-
-function appendMessageBubble(sender, text, isVoice = false) {
-  const div = document.createElement('div');
-  div.className = sender === 'user' ? 'flex justify-end my-3' : 'flex items-start gap-3 my-3';
-
-  if (sender === 'user') {
-    div.innerHTML = `
-      <div class="max-w-[85%] sm:max-w-md p-3.5 rounded-2xl rounded-tr-sm bg-gradient-to-r from-sky-600 to-blue-600 text-white shadow-lg text-xs sm:text-sm">
-        <p class="whitespace-pre-wrap leading-relaxed">${escapeHtml(text)}</p>
-        ${isVoice ? '<div class="flex items-center justify-end gap-1 text-[10px] text-sky-200 mt-1"><i data-lucide="mic" class="w-3 h-3"></i> Por voz</div>' : ''}
-      </div>
-    `;
-  }
-  elements.chatMessages.appendChild(div);
-  refreshIcons();
-  elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
-}
-
-function appendThinkingBubble(id) {
-  const div = document.createElement('div');
-  div.id = id;
-  div.className = 'flex items-start gap-3 my-3';
-  div.innerHTML = `
-    <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center flex-shrink-0 text-white shadow-md">
-      <i data-lucide="bot" class="w-4 h-4"></i>
-    </div>
-    <div class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 text-xs text-slate-400 flex items-center gap-2">
-      <span class="w-2 h-2 rounded-full bg-sky-400 animate-ping"></span>
-      <span>Pensando...</span>
-    </div>
-  `;
-  elements.chatMessages.appendChild(div);
-  refreshIcons();
-  elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
-}
-
-function replaceThinkingBubble(id, aiOutput) {
-  const el = document.getElementById(id);
-  if (!el) return;
-
-  const div = document.createElement('div');
-  div.className = 'flex items-start gap-3 my-3';
-
-  let actionBtns = '';
-  if (aiOutput.pdfAction) {
-    actionBtns += `
-      <div class="mt-3 pt-3 border-t border-slate-800">
-        <button data-download-pdf="${encodeURIComponent(aiOutput.pdfTitle||'Documento')}" data-content="${encodeURIComponent(aiOutput.pdfContent||aiOutput.text)}" class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md transition-colors">
-          <i data-lucide="download" class="w-3.5 h-3.5"></i> Descargar PDF
-        </button>
-      </div>
-    `;
-  }
-  if (aiOutput.calendarAction) {
-    const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(aiOutput.calendarTitle)}`;
-    actionBtns += `
-      <div class="mt-3 pt-3 border-t border-slate-800 flex gap-2 flex-wrap">
-        <a href="${googleUrl}" target="_blank" class="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md transition-colors">
-          <i data-lucide="calendar" class="w-3.5 h-3.5"></i> Google Calendar
-        </a>
-        <button data-download-ics="${encodeURIComponent(aiOutput.calendarTitle)}" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center gap-1.5 transition-colors">
-          <i data-lucide="smartphone" class="w-3.5 h-3.5"></i> Apple Calendar (.ics)
-        </button>
-      </div>
-    `;
-  }
-
-  div.innerHTML = `
-    <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center flex-shrink-0 text-white shadow-md mt-0.5">
-      <i data-lucide="bot" class="w-4 h-4"></i>
-    </div>
-    <div class="flex-1 max-w-[88%] sm:max-w-xl">
-      <div class="math-content p-4 rounded-2xl rounded-tl-sm bg-slate-900 border border-slate-800 text-slate-200 shadow-md text-xs sm:text-sm leading-relaxed select-text">
-        ${formatMarkdown(aiOutput.text)}
-        ${actionBtns}
-      </div>
-      <div class="flex items-center gap-3 mt-1.5 px-1 text-[11px] text-slate-500">
-        <button data-speak-msg="${encodeURIComponent(aiOutput.speechText||aiOutput.text)}" class="hover:text-sky-400 transition-colors flex items-center gap-1 text-sky-400 font-medium">
-          <i data-lucide="volume-2" class="w-3.5 h-3.5"></i> Reproducir
-        </button>
-        <span>•</span>
-        <button data-copy-msg="${encodeURIComponent(aiOutput.text)}" class="hover:text-slate-300 transition-colors flex items-center gap-1">
-          <i data-lucide="copy" class="w-3.5 h-3.5"></i> Copiar
-        </button>
-      </div>
-    </div>
-  `;
-
-  el.replaceWith(div);
-  refreshIcons();
-  renderMathFormulas(div.querySelector('.math-content'));
-
-  div.querySelector('[data-speak-msg]')?.addEventListener('click', (e) => {
-    speakSpanishVoice(decodeURIComponent(e.currentTarget.dataset.speakMsg));
-  });
-
-  div.querySelector('[data-copy-msg]')?.addEventListener('click', (e) => {
-    navigator.clipboard.writeText(decodeURIComponent(e.currentTarget.dataset.copyMsg));
-    e.currentTarget.textContent = '✓ Copiado';
-    setTimeout(() => { e.currentTarget.innerHTML = '<i data-lucide="copy" class="w-3 h-3"></i> Copiar'; refreshIcons(); }, 2000);
-  });
-
-  div.querySelector('[data-download-pdf]')?.addEventListener('click', (e) => {
-    generatePdfDocument(
-      decodeURIComponent(e.currentTarget.dataset.downloadPdf),
-      decodeURIComponent(e.currentTarget.dataset.content)
-    );
-  });
-
-  div.querySelector('[data-download-ics]')?.addEventListener('click', (e) => {
-    downloadIcsCalendarFile(decodeURIComponent(e.currentTarget.dataset.downloadIcs));
-  });
-
-  elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
-}
-
-function generatePdfDocument(title, text) {
-  try {
-    const { jsPDF } = window.jspdf || {};
-    if (!jsPDF) { alert('PDF no disponible'); return; }
-    const doc = new jsPDF();
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(18);
-    doc.setTextColor(2, 132, 199);
-    doc.text(title, 20, 25);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(100, 116, 139);
-    doc.text(`VoiceNote AI • Hugo SP Studios • ${new Date().toLocaleString()}`, 20, 33);
-    doc.setDrawColor(226, 232, 240);
-    doc.line(20, 37, 190, 37);
-    doc.setFontSize(11);
-    doc.setTextColor(30, 41, 59);
-    doc.text(doc.splitTextToSize(text, 170), 20, 48);
-    doc.save(`${title.replace(/\s+/g,'_')}.pdf`);
-  } catch (err) { console.error(err); }
-}
-
-function downloadIcsCalendarFile(title) {
-  const now   = new Date();
-  const start = new Date(now.getTime() + 86400000).toISOString().replace(/[-:]|\.\d{3}/g, '');
-  const end   = new Date(now.getTime() + 90000000).toISOString().replace(/[-:]|\.\d{3}/g, '');
-  const ics   = [
-    'BEGIN:VCALENDAR','VERSION:2.0',
-    'PRODID:-//Hugo SP Studios//VoiceNote AI//ES',
-    'BEGIN:VEVENT',
-    `SUMMARY:${title}`,
-    `DESCRIPTION:Agendado desde VoiceNote AI de Hugo SP Studios`,
-    `DTSTART:${start}`,`DTEND:${end}`,
-    'STATUS:CONFIRMED','END:VEVENT','END:VCALENDAR'
-  ].join('\r\n');
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
-  a.download = `${title.replace(/\s+/g,'_')}.ics`;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-}
-
-function formatMarkdown(text) {
-  return escapeHtml(text)
-    .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
-    .replace(/^### (.*$)/gim, '<h3 class="text-sm font-bold text-sky-300 mt-2.5 mb-1">$1</h3>')
-    .replace(/^• (.*$)/gim, '<li class="ml-3 list-disc text-slate-300">$1</li>')
-    .replace(/\n/g, '<br>');
-}
-
-function escapeHtml(text) {
-  return (text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-// =====================================================
-// EVENT LISTENERS
-// =====================================================
-
-// Enviar mensaje escrito (por formulario)
-if (elements.chatForm) {
-  elements.chatForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const text = elements.chatInput.value.trim();
-    if (text) handleUserSubmit(text, false);
-  });
-}
-
-// Enviar mensaje haciendo clic en el botón de la flecha
-if (elements.sendBtn) {
-  elements.sendBtn.addEventListener('click', (e) => {
-    e.preventDefault();
-    const text = elements.chatInput.value.trim();
-    if (text) handleUserSubmit(text, false);
-  });
-}
-
-// Enviar pulsando tecla Enter en el campo de texto
-if (elements.chatInput) {
-  elements.chatInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      const text = elements.chatInput.value.trim();
-      if (text) handleUserSubmit(text, false);
-    }
-  });
-}
-
-// Micrófono de dictado (texto)
-if (elements.micBtn) {
-  elements.micBtn.addEventListener('click', () => {
-    if (state.isRecording) {
-      stopSpeechRecognizer();
-    } else {
-      elements.micBtn.classList.remove('bg-slate-800','text-slate-300');
-      elements.micBtn.classList.add('bg-red-500','text-white','animate-pulse');
-      elements.micIcon.setAttribute('data-lucide','square');
-      refreshIcons();
-      startSpeechRecognizer();
-    }
-  });
-}
-
-// Botón MODO VOZ
-if (elements.openLiveVoiceBtn) {
-  elements.openLiveVoiceBtn.addEventListener('touchend', (e) => {
-    e.preventDefault();
-    openLiveVoiceModal(e);
-  });
-  elements.openLiveVoiceBtn.addEventListener('click', (e) => {
-    if (e.pointerType !== 'touch') openLiveVoiceModal(e);
-  });
-}
-
-// Cerrar modal de voz
-if (elements.closeLiveVoiceBtn) {
-  elements.closeLiveVoiceBtn.addEventListener('touchend', (e) => { e.preventDefault(); closeLiveVoiceModal(e); });
-  elements.closeLiveVoiceBtn.addEventListener('click',    (e) => { if (e.pointerType !== 'touch') closeLiveVoiceModal(e); });
-}
-
-// Botón repetir última respuesta en voz
-if (elements.manualSpeakBtn) {
-  elements.manualSpeakBtn.addEventListener('click', () => {
-    if (state.lastAiSpeechText) speakSpanishVoice(state.lastAiSpeechText);
-  });
-}
-
-// Micrófono dentro del modal de voz
-if (elements.toggleVoiceCallMicBtn) {
-  elements.toggleVoiceCallMicBtn.addEventListener('click', () => {
-    if (state.isRecording) {
-      stopSpeechRecognizer();
-      elements.callMicIcon.setAttribute('data-lucide','mic-off');
-    } else {
-      startSpeechRecognizer();
-      elements.callMicIcon.setAttribute('data-lucide','mic');
-    }
-    refreshIcons();
-  });
-}
-
-// Nueva conversación
-if (elements.clearChatBtn) {
-  elements.clearChatBtn.addEventListener('click', () => {
-    state.conversationHistory = [];
-    location.reload();
-  });
-}
-
-// Modal de Configuración (Gemini API Key)
-if (elements.settingsBtn && elements.settingsModal) {
-  elements.settingsBtn.addEventListener('click', () => {
-    elements.geminiApiKeyInput.value = state.geminiApiKey || '';
-    elements.apiKeyStatus.textContent = state.geminiApiKey ? '✓ Clave guardada' : '';
-    elements.apiKeyStatus.className = 'text-emerald-400 text-[10px]';
-    elements.settingsModal.classList.remove('hidden');
-    elements.settingsModal.style.display = 'flex';
-    refreshIcons();
-  });
-
-  elements.closeSettingsBtn.addEventListener('click', () => {
-    elements.settingsModal.classList.add('hidden');
-    elements.settingsModal.style.display = 'none';
-  });
-
-  elements.saveSettingsBtn.addEventListener('click', () => {
-    const key = elements.geminiApiKeyInput.value.trim();
-    state.geminiApiKey = key;
-    if (key) {
-      safeSetStorage('voicenote_gemini_key', key);
-      elements.apiKeyStatus.textContent = '✓ Guardado correctamente';
-      elements.apiKeyStatus.className = 'text-emerald-400 text-[10px]';
-    } else {
-      safeRemoveStorage('voicenote_gemini_key');
-      elements.apiKeyStatus.textContent = 'Modo libre activado';
-      elements.apiKeyStatus.className = 'text-sky-400 text-[10px]';
-    }
-    setTimeout(() => {
-      elements.settingsModal.classList.add('hidden');
-      elements.settingsModal.style.display = 'none';
-    }, 600);
-  });
-}
-
-// Inicialización
-window.addEventListener('DOMContentLoaded', () => {
-  initVoices();
-  refreshIcons();
-});
+  // 2. INTENTO 2: Pollinations Direct (Sin registro
