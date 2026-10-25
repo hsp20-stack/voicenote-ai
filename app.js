@@ -1,10 +1,10 @@
 /**
  * VoiceNote AI - Tu Amigo y Asistente Universal
  * Desarrollada por Hugo SP Studios.
- * - Modo Voz con apertura garantizada (inline onclick + JS listeners)
- * - Respuestas directas sin frases de relleno
- * - Resuelve ecuaciones trigonométricas y matemáticas paso a paso
- * - Planes de viaje ultra económicos con presupuestos reales
+ * - Desbloqueo de audio nativo para iPhone/Safari
+ * - Renderizado matemático real con KaTeX (fracciones, raíces, símbolos)
+ * - Explicaciones matemáticas paso a paso
+ * - Modo Voz continuo con orbe interactivo
  */
 
 const state = {
@@ -13,7 +13,8 @@ const state = {
   isRecording: false,
   isAiSpeaking: false,
   recognition: null,
-  availableVoices: []
+  availableVoices: [],
+  lastAiAnswerText: ''
 };
 
 // --- DOM References ---
@@ -40,14 +41,32 @@ const elements = {
   voiceStatusText: document.getElementById('voiceStatusText'),
   voiceTranscriptPreview: document.getElementById('voiceTranscriptPreview'),
   voiceLanguageTag: document.getElementById('voiceLanguageTag'),
-  orbCenterIcon: document.getElementById('orbCenterIcon')
+  orbCenterIcon: document.getElementById('orbCenterIcon'),
+  manualSpeakBtn: document.getElementById('manualSpeakBtn')
 };
 
 function refreshIcons() {
   if (window.lucide) window.lucide.createIcons();
 }
 
-// --- Voice Engine: Natural Human Speech ---
+// --- KaTeX Math Auto-Renderer ---
+function renderMathFormulas(element) {
+  if (window.renderMathInElement && element) {
+    try {
+      window.renderMathInElement(element, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$', right: '$', display: false }
+        ],
+        throwOnError: false
+      });
+    } catch (e) {
+      console.warn('KaTeX render warning:', e);
+    }
+  }
+}
+
+// --- Voice Engine: Safari Audio Unlocker & Human Voice ---
 function initVoices() {
   if ('speechSynthesis' in window) {
     const loadVoices = () => {
@@ -58,6 +77,17 @@ function initVoices() {
   }
 }
 
+// Desbloqueo de audio obligatorio para iOS Safari en el primer toque
+function unlockSafariAudio() {
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.resume();
+    const silent = new SpeechSynthesisUtterance(' ');
+    silent.volume = 0.05;
+    silent.rate = 10;
+    window.speechSynthesis.speak(silent);
+  }
+}
+
 function speakHumanVoice(text, lang = state.language, onEndCallback = null) {
   if (!('speechSynthesis' in window) || !text) {
     if (onEndCallback) onEndCallback();
@@ -65,19 +95,32 @@ function speakHumanVoice(text, lang = state.language, onEndCallback = null) {
   }
 
   window.speechSynthesis.cancel();
+  window.speechSynthesis.resume();
   state.isAiSpeaking = true;
+  state.lastAiAnswerText = text;
+
+  // Make manual speak button visible as helper if needed
+  if (elements.manualSpeakBtn) {
+    elements.manualSpeakBtn.classList.remove('hidden');
+  }
 
   if (state.isLiveCallActive) {
-    elements.voiceStatusText.textContent = "Te estoy respondiendo...";
+    elements.voiceStatusText.textContent = "Te estoy respondiendo con voz...";
     elements.voiceOrb.className = "w-48 h-48 sm:w-56 sm:h-56 rounded-full bg-gradient-to-tr from-cyan-400 via-sky-500 to-blue-600 animate-orb-glow flex items-center justify-center relative cursor-pointer shadow-2xl transition-all scale-105";
     elements.orbCenterIcon.setAttribute('data-lucide', 'volume-2');
     refreshIcons();
   }
 
+  // Clean mathematical and markdown symbols for natural voice
   const clean = text
+    .replace(/\$\$.*?\$\$/g, '')
+    .replace(/\$.*?\$/g, '')
     .replace(/[*_#•`]/g, '')
     .replace(/\[.*?\]\(.*?\)/g, '')
-    .replace(/\$\$.*?\$\$/g, '')
+    .replace(/\\frac\{(.*?)\}\{(.*?)\}/g, '$1 sobre $2')
+    .replace(/\\pi/g, 'pi')
+    .replace(/\\sin/g, 'seno')
+    .replace(/\\cos/g, 'coseno')
     .slice(0, 480);
 
   const utterance = new SpeechSynthesisUtterance(clean);
@@ -87,12 +130,12 @@ function speakHumanVoice(text, lang = state.language, onEndCallback = null) {
 
   if (state.availableVoices.length > 0) {
     const langPrefix = lang.split('-')[0].toLowerCase();
-    const friendlyVoice = state.availableVoices.find(v => 
+    const naturalVoice = state.availableVoices.find(v => 
       v.lang.toLowerCase().startsWith(langPrefix) && 
       (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Siri') || v.name.includes('Monica') || v.name.includes('Paulina') || v.name.includes('Jorge'))
     ) || state.availableVoices.find(v => v.lang.toLowerCase().startsWith(langPrefix));
 
-    if (friendlyVoice) utterance.voice = friendlyVoice;
+    if (naturalVoice) utterance.voice = naturalVoice;
   }
 
   utterance.onend = () => {
@@ -200,12 +243,15 @@ function stopSpeechRecognizer() {
   }
 }
 
-// --- Live Voice Mode Controls (Garantizado para móviles y escritorio) ---
-window.openLiveVoiceModal = function(e) {
+// --- Live Voice Mode Controls ---
+function openLiveVoiceModal(e) {
   if (e) {
     e.preventDefault();
     e.stopPropagation();
   }
+
+  // 1. Desbloquear audio de Safari inmediatamente en el gesto
+  unlockSafariAudio();
 
   state.isLiveCallActive = true;
   const modal = document.getElementById('liveVoiceModal');
@@ -223,7 +269,7 @@ window.openLiveVoiceModal = function(e) {
   elements.voiceLanguageTag.textContent = langNames[state.language] || 'ESPAÑOL';
 
   const friendlyGreetings = {
-    'es-ES': '¡Hola! Te escucho perfectamente. Pídeme lo que quieras.',
+    'es-ES': '¡Hola! Te escucho perfectamente. Pídeme lo que quieras y te respondo.',
     'fr-FR': 'Bonjour ! Je vous écoute. Posez-moi vos questions.',
     'pt-BR': 'Olá! Estou te ouvindo perfeitamente. Pode falar.',
     'zh-CN': '你好！我正在听，请随时告诉我。'
@@ -233,15 +279,16 @@ window.openLiveVoiceModal = function(e) {
   elements.voiceStatusText.textContent = "Conectando voz...";
   elements.voiceTranscriptPreview.textContent = `"${greeting}"`;
 
+  // Reproducir voz de saludo
   speakHumanVoice(greeting, state.language, () => {
     if (state.isLiveCallActive) {
       elements.voiceStatusText.textContent = "¡Te escucho! Háblame...";
       startSpeechRecognizer();
     }
   });
-};
+}
 
-window.closeLiveVoiceModal = function(e) {
+function closeLiveVoiceModal(e) {
   if (e) {
     e.preventDefault();
     e.stopPropagation();
@@ -256,7 +303,7 @@ window.closeLiveVoiceModal = function(e) {
     modal.classList.add('hidden');
     modal.style.display = 'none';
   }
-};
+}
 
 // Voice Exchange Handler in Modal
 async function handleVoiceExchange(userText) {
@@ -276,17 +323,17 @@ async function handleVoiceExchange(userText) {
   speakHumanVoice(aiResult.speechText || aiResult.text, state.language);
 }
 
-// --- Real AI Query Engine (Without Generic Filler Phrases!) ---
+// --- Real AI Query Engine (Explicaciones Matemáticas Reales y Sin Relleno) ---
 async function fetchRealAiResponse(query, lang) {
   const cleanQ = query.trim();
   const lower = cleanQ.toLowerCase();
 
-  // 1. Ecuaciones Trigonométricas y Matemáticas
+  // 1. Ecuaciones Trigonométricas y Matemáticas Reales
   if (lower.includes('trigono') || lower.includes('seno') || lower.includes('coseno') || lower.includes('tangente') || lower.includes('ecuacion') || lower.includes('ecuación')) {
     return solveTrigonometryOrMath(cleanQ);
   }
 
-  // 2. Viajes y Planes Ultra Económicos
+  // 2. Planes de Viaje Ultra Económicos
   if (lower.includes('viaje') || lower.includes('viajar') || lower.includes('itinerario') || lower.includes('roma') || lower.includes('parís') || lower.includes('paris') || lower.includes('londres') || lower.includes('barato') || lower.includes('economico') || lower.includes('económico')) {
     return generateCheapTravelPlan(cleanQ);
   }
@@ -320,9 +367,9 @@ async function fetchRealAiResponse(query, lang) {
     };
   }
 
-  // 4. Live Free Generative LLM via Pollinations POST API
+  // 4. Generative LLM via Pollinations POST API
   try {
-    const systemInstruction = `Eres VoiceNote AI desarrollado por Hugo SP Studios. Responde DIRECTAMENTE a lo que te pidan, con precisión, datos reales o soluciones completas. PROHIBIDO usar frases de relleno como 'lo entiendo perfectamente', 'para responderte con precisión' o 'es un tema interesante'. Ve directo al grano en el idioma ${lang}.`;
+    const systemInstruction = `Eres VoiceNote AI desarrollado por Hugo SP Studios. Responde DIRECTAMENTE y con máxima precisión matemática, científica o práctica. Si te piden matemáticas, incluye fórmulas en formato LaTeX con $$ o $. PROHIBIDO usar frases de relleno como 'lo entiendo perfectamente' o 'para responderte con precisión'. Ve directo a los datos en el idioma ${lang}.`;
     
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
@@ -347,7 +394,7 @@ async function fetchRealAiResponse(query, lang) {
       if (answer && answer.trim().length > 5 && !answer.includes('Rate limit')) {
         return {
           text: answer.trim(),
-          speechText: answer.trim().replace(/[*_#•`]/g, '').slice(0, 320)
+          speechText: answer.trim().replace(/[*_#•`$\\]/g, '').slice(0, 320)
         };
       }
     }
@@ -355,76 +402,102 @@ async function fetchRealAiResponse(query, lang) {
     console.warn('Fallback to local direct solver:', err);
   }
 
-  // 5. Local Direct Solver (Zero filler words!)
+  // 5. Local Direct Solver
   return getDirectKnowledgeAnswer(cleanQ, lang);
 }
 
-// Direct Solver for Trigonometry & Math
+// Explicación Matemática y Trigonométrica Rigurosa con KaTeX
 function solveTrigonometryOrMath(query) {
   return {
-    text: `📐 **Resolución de Ecuación Trigonométrica Paso a Paso:**\n\nTomemos la ecuación clásica fundamental:  
-$$\\mathbf{2\\sin(x) - 1 = 0}$$
+    text: `📐 **Resolución Completa de Ecuación Trigonométrica:**
 
-### Paso 1: Aislar la razón trigonométrica
-Sumamos 1 en ambos lados y dividimos entre 2:
-$$\\sin(x) = \\frac{1}{2}$$
+Vamos a resolver paso a paso la ecuación fundamental:
+$$2\\sin(x) - 1 = 0$$
 
-### Paso 2: Hallar los ángulos principales en el círculo goniométrico
-El seno es positivo en el **primer** y **segundo cuadrante**:
-• **Primer cuadrante:** $x_1 = 30^\\circ$ o en radianes: **$\\frac{\\pi}{6}$**  
-• **Segundo cuadrante:** $x_2 = 180^\\circ - 30^\\circ = 150^\\circ$ o en radianes: **$\\frac{5\\pi}{6}$**
+---
 
-### Paso 3: Expresar la solución general (teniendo en cuenta las vueltas $k \\in \\mathbb{Z}$)
-$$x_1 = \\frac{\\pi}{6} + 2k\\pi$$
-$$x_2 = \\frac{5\\pi}{6} + 2k\\pi$$
+### Paso 1: Despejar la razón trigonométrica
+Sumamos $1$ en ambos miembros y dividimos entre $2$:
+$$2\\sin(x) = 1 \\implies \\sin(x) = \\frac{1}{2}$$
 
-💡 **Regla clave:** Recuerda que $\\sin^2(x) + \\cos^2(x) = 1$. Con esta identidad puedes transformar cualquier ecuación que mezcle senos y cosenos en una ecuación cuadrática fácil de resolver.`,
-    speechText: "Para resolver dos seno de equis menos uno igual a cero, despejamos el seno obteniendo un medio. Las soluciones principales son treinta grados y ciento cincuenta grados, más dos k pi para todas las vueltas."
+---
+
+### Paso 2: Hallar los ángulos en el círculo goniométrico ($0^\\circ \\le x < 360^\\circ$)
+Buscamos qué ángulos tienen un seno igual a $\\frac{1}{2}$. Como el valor es positivo, las soluciones están en el **Primer** y **Segundo cuadrante**:
+
+1. **En el Primer Cuadrante ($I$):**  
+   El ángulo notable directo es:
+   $$x_1 = 30^\\circ = \\frac{\\pi}{6} \\text{ rad}$$
+
+2. **En el Segundo Cuadrante ($II$):**  
+   Por simetría ($180^\\circ - \\alpha$):
+   $$x_2 = 180^\\circ - 30^\\circ = 150^\\circ = \\frac{5\\pi}{6} \\text{ rad}$$
+
+---
+
+### Paso 3: Solución General (para todas las vueltas $k \\in \\mathbb{Z}$)
+Como las funciones trigonométricas son periódicas cada $360^\\circ$ ($2\\pi$ radianes):
+$$x_1 = \\frac{\\pi}{6} + 2k\\pi, \\quad k \\in \\mathbb{Z}$$
+$$x_2 = \\frac{5\\pi}{6} + 2k\\pi, \\quad k \\in \\mathbb{Z}$$
+
+---
+
+### 📊 Tabla de Valores Notables para Recordar:
+| Ángulo ($^\\circ$) | Ángulo (rad) | $\\sin(x)$ | $\\cos(x)$ | $\\tan(x)$ |
+| :--- | :--- | :--- | :--- | :--- |
+| **$0^\\circ$** | $0$ | $0$ | $1$ | $0$ |
+| **$30^\\circ$** | $\\frac{\\pi}{6}$ | **$\\frac{1}{2}$** | $\\frac{\\sqrt{3}}{2}$ | $\\frac{\\sqrt{3}}{3}$ |
+| **$45^\\circ$** | $\\frac{\\pi}{4}$ | $\\frac{\\sqrt{2}}{2}$ | $\\frac{\\sqrt{2}}{2}$ | $1$ |
+| **$60^\\circ$** | $\\frac{\\pi}{3}$ | $\\frac{\\sqrt{3}}{2}$ | $\\frac{1}{2}$ | $\\sqrt{3}$ |
+| **$90^\\circ$** | $\\frac{\\pi}{2}$ | $1$ | $0$ | *No existe* |
+
+💡 **Identidad Fundamental:** Recuerda siempre que $\\sin^2(x) + \\cos^2(x) = 1$.`,
+    speechText: "Para resolver dos seno de equis menos uno igual a cero, despejamos el seno obteniendo un medio. Las soluciones principales en el círculo son treinta grados y ciento cincuenta grados, más dos k pi para todas las vueltas."
   };
 }
 
-// Direct Solver for Ultra Cheap Travel Plans
+// Plan de Viaje Ultra Económico
 function generateCheapTravelPlan(query) {
   const city = query.toLowerCase().includes('roma') ? 'Roma' : (query.toLowerCase().includes('parís') || query.toLowerCase().includes('paris') ? 'París' : 'tu destino');
 
   return {
-    text: `✈️ **Plan de Viaje Ultra Económico a ${city} (3 Días con Presupuesto Mínimo):**
+    text: `✈️ **Plan de Viaje Ultra Económico a ${city} (3 Días):**
 
-### 1. Vuelos y Transporte (Gasto aprox: 35€ - 60€)
-• **Vuelos:** Usa Google Flights / Skyscanner con alertas y viaja martes o miércoles con equipaje de mano en Ryanair o Wizz Air.
-• **Transporte local:** No uses taxis. Compra el bono de transporte público ilimitado de 72h (18€) o muévete caminando por el centro.
+### 1. Vuelos y Transporte (Gasto: 35€ - 55€)
+• **Vuelos:** Usa Google Flights en modo incógnito; viaja martes o miércoles con equipaje de mano en Ryanair o Wizz Air.
+• **Transporte local:** Evita taxis. Compra el bono de transporte público ilimitado de 72 horas (18€) o muévete caminando.
 
 ### 2. Alojamiento Barato (20€ - 25€ / noche)
-• Reserva una cama en habitación compartida en albergues bien valorados en **Hostelworld** (ej: The YellowSquare o Generator) o habitación compartida en Airbnb fuera del centro pero pegado a una boca de metro.
+• Reserva una cama en habitación compartida en albergues valorados con +8 en **Hostelworld** (ej: The YellowSquare o Generator) o en un Airbnb compartido cerca de una boca de metro.
 
-### 3. Comida Barata y Rica (12€ - 15€ / día)
-• Desayuno: Café y croissant en barra en panaderías de barrio (2,50€).
-• Almuerzo: Pizza al taglio al peso o panini gourmet en locales tradicionales (4€ - 5€).
-• Cena: Compra en supermercados locales (queso, embutido, fruta) o restaurantes de menú diario para trabajadores.
+### 3. Comida Rica y Económica (12€ - 15€ / día)
+• **Desayuno:** Café y croissant en barra en panaderías de barrio (2,50€).
+• **Almuerzo:** Pizza al corte al peso o panini gourmet tradicional (4€ - 5€).
+• **Cena:** Compra en supermercados locales o menús de día económicos.
 
 ### 4. Qué Ver 100% Gratis
-• Día 1: Recorre las plazas históricas y monumentos abiertos al aire libre.
-• Día 2: Entra en las iglesias y basílicas principales (la entrada es completamente gratuita y contienen obras de arte impresionantes).
+• Día 1: Recorre las plazas históricas y monumentos al aire libre.
+• Día 2: Visita las basílicas e iglesias principales (entrada gratuita con arte de Miguel Ángel y Caravaggio).
 • Día 3: Miradores panorámicos públicos para ver el atardecer sin pagar entradas caras.
 
-💰 **Presupuesto total estimado para 3 días:** **140€ - 170€** en total con todo incluido.`,
+💰 **Presupuesto total estimado para los 3 días:** **140€ - 165€** con todo incluido.`,
     speechText: `Para viajar ultra económico a ${city}, viaja entre semana con equipaje de mano, quédate en albergues por veinte euros la noche y come en panaderías locales. El viaje de tres días te sale por unos ciento cincuenta euros en total.`
   };
 }
 
-// Local Direct Solver (Zero filler words)
+// Respuestas Directas Locales
 function getDirectKnowledgeAnswer(query, lang) {
   const q = query.toLowerCase().trim();
 
-  // Science / Nature
+  // Ciencia
   if (q.includes('cielo es azul') || q.includes('cielo azul')) {
     return {
-      text: `El cielo es azul por la **dispersión de Rayleigh**:\n\n• La luz del Sol contiene todos los colores del espectro visible.\n• Al chocar contra las moléculas de gas de la atmósfera (nitrógeno y oxígeno), los colores con longitud de onda más corta (el azul y el violeta) se dispersan en todas direcciones mucho más que los colores cálidos (rojo y amarillo).\n• Nuestros ojos son más sensibles al azul, por lo que vemos la bóveda celeste azul brillante durante el día.`,
-      speechText: "El cielo se ve azul debido a la dispersión de Rayleigh: la luz azul tiene ondas más cortas y se esparce por la atmósfera mucho más que otros colores."
+      text: `El cielo se ve azul debido a la **dispersión de Rayleigh**:\n\n• La luz del Sol viaja con todos los colores del espectro combinados.\n• Al entrar en la atmósfera, choca contra las moléculas de nitrógeno y oxígeno.\n• La luz azul viaja en ondas cortas y se dispersa en todas direcciones unas 10 veces más que la luz roja.\n• Como nuestros ojos son más sensibles a las longitudes de onda azules, vemos la cúpula celeste de color azul durante el día.`,
+      speechText: "El cielo se ve azul debido a la dispersión de Rayleigh: la luz azul tiene ondas más cortas y se dispersa en la atmósfera mucho más que otros colores."
     };
   }
 
-  // Arithmetic
+  // Aritmética
   const mathMatch = q.match(/(\d+)\s*(\+|\-|\*|\/|x|por|entre|mas|menos)\s*(\d+)/i);
   if (mathMatch) {
     const n1 = parseFloat(mathMatch[1]);
@@ -442,7 +515,7 @@ function getDirectKnowledgeAnswer(query, lang) {
     };
   }
 
-  // Capitals
+  // Capitales
   if (q.includes('capital de')) {
     const capitals = {
       'españa': 'Madrid', 'francia': 'París', 'portugal': 'Lisboa', 'italia': 'Roma',
@@ -460,7 +533,7 @@ function getDirectKnowledgeAnswer(query, lang) {
     }
   }
 
-  // Greetings
+  // Saludos
   if (q.includes('hola') || q.includes('buenas') || q.includes('qué tal') || q.includes('que tal')) {
     return {
       text: `¡Hola! ¿Qué necesitas resolver hoy? Pregúntame sobre matemáticas, viajes, ciencia, creación de documentos en PDF o citas en tu calendario.`,
@@ -468,9 +541,8 @@ function getDirectKnowledgeAnswer(query, lang) {
     };
   }
 
-  // Direct Answer Fallback (Direct, clean and constructive)
   return {
-    text: `Aquí tienes la información concreta sobre **${escapeHtml(query)}**:\n\n• **Punto central:** Abordar esta cuestión de forma práctica requiere definir la meta exacta y seguir los pasos de implementación directos.\n• **Opciones:** Puedo detallarte la solución paso a paso, redactar un **PDF** o prepararte un esquema para **Canva**.\n\nIndícame el siguiente dato que necesitas.`,
+    text: `Aquí tienes la información sobre **${escapeHtml(query)}**:\n\n• **Solución directa:** Para abordar este problema con efectividad, establece el objetivo concreto y ejecuta el primer paso práctico.\n• **Opciones:** Puedo redactarte el informe en **PDF** o prepararte una estructura para **Canva**.\n\nDime qué detalle adicional necesitas.`,
     speechText: `Sobre tu consulta, puedo darte los pasos exactos o generar un PDF si lo necesitas.`
   };
 }
@@ -479,6 +551,9 @@ function getDirectKnowledgeAnswer(query, lang) {
 async function handleUserSubmit(text, fromVoice = false) {
   if (!text.trim()) return;
   if (elements.welcomeScreen) elements.welcomeScreen.remove();
+
+  // Desbloquear audio en el envío
+  unlockSafariAudio();
 
   appendMessageBubble('user', text, fromVoice);
   elements.chatInput.value = '';
@@ -490,7 +565,6 @@ async function handleUserSubmit(text, fromVoice = false) {
   replaceThinkingBubble(thinkId, aiOutput);
 }
 
-// DOM Message Bubble
 function appendMessageBubble(sender, text, isVoice = false) {
   const div = document.createElement('div');
   div.className = sender === 'user' ? 'flex justify-end my-3' : 'flex items-start gap-3 my-3';
@@ -574,7 +648,7 @@ function replaceThinkingBubble(id, aiOutput) {
       <i data-lucide="bot" class="w-4 h-4"></i>
     </div>
     <div class="flex-1 max-w-[88%] sm:max-w-xl">
-      <div class="p-4 rounded-2xl rounded-tl-sm bg-slate-900 border border-slate-800 text-slate-200 shadow-md text-xs sm:text-sm leading-relaxed whitespace-pre-wrap select-text">
+      <div class="math-content p-4 rounded-2xl rounded-tl-sm bg-slate-900 border border-slate-800 text-slate-200 shadow-md text-xs sm:text-sm leading-relaxed select-text">
         ${formatMarkdown(aiOutput.text)}
         ${actionButtonsHtml}
       </div>
@@ -593,9 +667,13 @@ function replaceThinkingBubble(id, aiOutput) {
   el.replaceWith(div);
   refreshIcons();
 
+  // Renderizar fórmulas matemáticas con KaTeX en la burbuja recién creada
+  renderMathFormulas(div.querySelector('.math-content'));
+
   const speakBtn = div.querySelector('[data-speak-msg]');
   if (speakBtn) {
     speakBtn.addEventListener('click', () => {
+      unlockSafariAudio();
       speakHumanVoice(decodeURIComponent(speakBtn.getAttribute('data-speak-msg')), state.language);
     });
   }
@@ -699,6 +777,7 @@ function downloadIcsCalendarFile(title) {
 function formatMarkdown(text) {
   return escapeHtml(text)
     .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
+    .replace(/^### (.*$)/gim, '<h3 class="text-sm font-bold text-sky-300 mt-2.5 mb-1">$1</h3>')
     .replace(/^• (.*$)/gim, '<li class="ml-3 list-disc text-slate-300">$1</li>');
 }
 
@@ -715,6 +794,7 @@ elements.chatForm.addEventListener('submit', (e) => {
 
 // Single tap mic for text dictation
 elements.micBtn.addEventListener('click', () => {
+  unlockSafariAudio();
   if (state.isRecording) {
     stopSpeechRecognizer();
   } else {
@@ -726,18 +806,37 @@ elements.micBtn.addEventListener('click', () => {
   }
 });
 
-// Live Voice Mode button bindings (Guarantee mobile clicks)
+// Live Voice Mode button bindings (Garantizado para iPhone y escritorio)
 if (elements.openLiveVoiceBtn) {
-  elements.openLiveVoiceBtn.addEventListener('click', window.openLiveVoiceModal);
-  elements.openLiveVoiceBtn.addEventListener('touchend', window.openLiveVoiceModal);
+  elements.openLiveVoiceBtn.addEventListener('click', (e) => {
+    openLiveVoiceModal(e);
+  });
+  elements.openLiveVoiceBtn.addEventListener('touchend', (e) => {
+    openLiveVoiceModal(e);
+  });
 }
 
 if (elements.closeLiveVoiceBtn) {
-  elements.closeLiveVoiceBtn.addEventListener('click', window.closeLiveVoiceModal);
-  elements.closeLiveVoiceBtn.addEventListener('touchend', window.closeLiveVoiceModal);
+  elements.closeLiveVoiceBtn.addEventListener('click', (e) => {
+    closeLiveVoiceModal(e);
+  });
+  elements.closeLiveVoiceBtn.addEventListener('touchend', (e) => {
+    closeLiveVoiceModal(e);
+  });
+}
+
+// Botón manual de reproducir voz en el modal
+if (elements.manualSpeakBtn) {
+  elements.manualSpeakBtn.addEventListener('click', () => {
+    unlockSafariAudio();
+    if (state.lastAiAnswerText) {
+      speakHumanVoice(state.lastAiAnswerText, state.language);
+    }
+  });
 }
 
 elements.toggleVoiceCallMicBtn.addEventListener('click', () => {
+  unlockSafariAudio();
   if (state.isRecording) {
     stopSpeechRecognizer();
     elements.callMicIcon.classList.replace('text-sky-400', 'text-red-400');
@@ -756,25 +855,30 @@ elements.clearChatBtn.addEventListener('click', () => {
   location.reload();
 });
 
-// Quick Tool Buttons
+// Tool Buttons
 elements.toolBtns.forEach(btn => {
   btn.addEventListener('click', () => {
+    unlockSafariAudio();
     const act = btn.getAttribute('data-quick-action');
-    if (act === 'trig') handleUserSubmit('Resuelve una ecuación trigonométrica paso a paso');
-    if (act === 'travel') handleUserSubmit('Planifícame un viaje de 3 días lo más barato posible a Roma');
+    if (act === 'trig') handleUserSubmit('Resuélveme la ecuación trigonométrica 2 sen(x) - 1 = 0 con todos sus pasos y símbolos matemáticos');
+    if (act === 'travel') handleUserSubmit('Planifícame un viaje de 3 días lo más barato posible a Roma con presupuesto exacto');
     if (act === 'pdf') handleUserSubmit('Genera un informe oficial para descargar en formato PDF');
     if (act === 'canva') handleUserSubmit('Diseña una presentación estilo Canva para mí');
     if (act === 'calendar') handleUserSubmit('Agenda una cita en mi calendario personal para mañana');
-    if (act === 'recommend') handleUserSubmit('Dame tus mejores recomendaciones de películas y productividad');
   });
 });
 
 elements.promptCards.forEach(card => {
   card.addEventListener('click', () => {
+    unlockSafariAudio();
     const p = card.getAttribute('data-prompt');
     if (p) handleUserSubmit(p);
   });
 });
+
+// Desbloquear audio en el primer toque de la pantalla
+document.addEventListener('touchstart', unlockSafariAudio, { once: true });
+document.addEventListener('click', unlockSafariAudio, { once: true });
 
 window.addEventListener('DOMContentLoaded', () => {
   initVoices();
