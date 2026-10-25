@@ -46,13 +46,12 @@
   <div id="settingsModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 hidden z-50">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-4">
       <div class="flex justify-between items-center">
-        <h3 class="font-bold text-sm">Clave de Google Gemini (Opcional)</h3>
+        <h3 class="font-bold text-sm">Clave de Google Gemini</h3>
         <button id="closeSettings" class="text-slate-400 hover:text-white text-lg">✕</button>
       </div>
-      <p class="text-xs text-slate-400">Si tienes una clave de Gemini puedes ponerla aquí para respuestas personalizadas:</p>
-      <input type="text" id="apiKeyInput" placeholder="AIzaSy..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-sky-500 outline-none">
+      <p class="text-xs text-slate-400">Pega aquí tu clave de Google AI Studio (tanto si empieza por AQ como por AIza):</p>
+      <input type="text" id="apiKeyInput" placeholder="Pega tu clave aquí..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-sky-500 outline-none">
       <div class="flex justify-between items-center text-[11px]">
-        <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-sky-400 underline">Obtener en Google</a>
         <span id="keyStatus" class="text-emerald-400 font-semibold"></span>
       </div>
       <button id="saveKeyBtn" class="w-full py-2 bg-sky-600 hover:bg-sky-500 rounded-xl font-bold text-xs">Guardar Clave</button>
@@ -85,7 +84,7 @@
     function getConversationalAnswer(q) {
       const clean = q.toLowerCase().trim();
 
-      // Cálculos matemáticos directos (ej: 2+2, 5*8, etc.)
+      // Cálculos matemáticos
       const mathClean = clean.replace(/cuánto es|cuanto es|calcula|calcular/i, '').trim();
       const mathMatch = mathClean.match(/^([\d.,\s+\-*/()^]+)$/);
       if (mathMatch) {
@@ -147,7 +146,7 @@
       return null;
     }
 
-    // Consulta enciclopedia en tiempo real (gratis, sin claves, sin límites)
+    // Consulta enciclopedia en tiempo real
     async function searchEncyclopedia(q) {
       try {
         const clean = q
@@ -157,14 +156,12 @@
 
         if (!clean) return null;
 
-        // 1. Buscar el título más relevante en Wikipedia
         const searchUrl = `https://es.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(clean)}&limit=1&format=json&origin=*`;
         const sRes = await fetch(searchUrl);
         if (sRes.ok) {
           const sData = await sRes.json();
           const title = sData[1]?.[0];
           if (title) {
-            // 2. Obtener el resumen del artículo
             const sumUrl = `https://es.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
             const sumRes = await fetch(sumUrl);
             if (sumRes.ok) {
@@ -184,24 +181,32 @@
     async function askAI(q) {
       const cleanQ = q.trim();
 
-      // 1. Si pusiste clave de Gemini, la usamos con prioridad
+      // 1. Si hay clave Gemini (funciona tanto para claves AQ como AIza)
       if (state.apiKey) {
+        const key = state.apiKey.trim();
         try {
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(state.apiKey.trim())}`, {
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${encodeURIComponent(key)}`;
+          const res = await fetch(endpoint, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'X-goog-api-key': key
+            },
             body: JSON.stringify({
               contents: [{
-                parts: [{ text: `Eres VoiceNote AI de Hugo SP Studios. Responde en español de España de forma directa y clara a: ${cleanQ}` }]
+                parts: [{ text: `Eres VoiceNote AI de Hugo SP Studios. Responde en español de España de forma útil, concisa y directa a: ${cleanQ}` }]
               }]
             })
           });
+
           if (res.ok) {
             const data = await res.json();
             const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
             if (reply) return reply;
           }
-        } catch (e) {}
+        } catch (e) {
+          console.warn('Gemini call error:', e);
+        }
       }
 
       // 2. Respuesta conversacional / cálculo
@@ -213,7 +218,7 @@
       if (enc) return enc;
 
       // 4. Respuesta amigable por defecto
-      return `He procesado tu pregunta sobre "${cleanQ}". Puedo darte información de cualquier personaje histórico, ciencia, lugares, tecnología, hacer cálculos o contarte curiosidades.`;
+      return `He procesado tu pregunta sobre "${cleanQ}". Puedo darte información de personajes históricos, ciencia, países, tecnología, hacer cálculos o contarte curiosidades.`;
     }
 
     function appendMessage(sender, text) {
@@ -337,30 +342,12 @@
           return;
         }
 
-        keyStatus.textContent = '⏳ Comprobando...';
-        keyStatus.className = 'text-amber-400 font-semibold';
-
-        try {
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(k)}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts: [{ text: 'hola' }] }] })
-          });
-          if (res.ok) {
-            state.apiKey = k;
-            localStorage.setItem('gemini_key', k);
-            keyStatus.textContent = '✓ ¡Conectado!';
-            keyStatus.className = 'text-emerald-400 font-semibold';
-            setTimeout(() => settingsModal.classList.add('hidden'), 800);
-          } else {
-            keyStatus.textContent = '❌ Clave no válida';
-            keyStatus.className = 'text-rose-400 font-semibold';
-          }
-        } catch (e) {
-          state.apiKey = k;
-          localStorage.setItem('gemini_key', k);
-          settingsModal.classList.add('hidden');
-        }
+        // Guardamos directamente la clave sin trabas
+        state.apiKey = k;
+        localStorage.setItem('gemini_key', k);
+        keyStatus.textContent = '✓ ¡Clave guardada con éxito!';
+        keyStatus.className = 'text-emerald-400 font-semibold';
+        setTimeout(() => settingsModal.classList.add('hidden'), 700);
       });
     });
   </script>
