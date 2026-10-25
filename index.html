@@ -44,6 +44,8 @@
   </script>
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Puter.js CDN para IA Gratuita en Cliente sin CORS -->
+  <script src="https://js.puter.com/v2/"></script>
   <!-- jsPDF CDN para generar PDFs -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   
@@ -91,7 +93,7 @@
     </div>
   </header>
 
-  <!-- Contenedor Principal de Chat (Puro y Limpio, Sin Botones de Relleno) -->
+  <!-- Contenedor Principal de Chat -->
   <main class="flex-1 max-w-4xl w-full mx-auto px-4 py-4 flex flex-col justify-between">
     
     <!-- Feed de Conversación -->
@@ -142,7 +144,7 @@
               <circle cx="80" cy="50" r="11" fill="#0f172a"/>
               <circle cx="80" cy="50" r="7" fill="#38bdf8"/>
               <circle cx="83" cy="47" r="2.5" fill="white"/>
-              <!-- Párpado de GUIÑO (baja completamente en distintos tiempos) -->
+              <!-- Párpado de GUIÑO -->
               <rect id="lidRight" x="69" y="39" width="22" height="0" rx="4" fill="#0ea5e9">
                 <animate attributeName="height" values="0;22;22;0" keyTimes="0;0.2;0.8;1" dur="3s" begin="1.5s" repeatCount="indefinite"/>
               </rect>
@@ -207,7 +209,7 @@
           <i data-lucide="arrow-up" class="w-4 h-4"></i>
         </button>
 
-        <!-- BOTÓN MODO VOZ: COMPACTO (w-10 h-10) Y AL LADO DE ENVIAR -->
+        <!-- BOTÓN MODO VOZ -->
         <button type="button" id="openLiveVoiceBtn" class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 via-sky-600 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white flex items-center justify-center flex-shrink-0 shadow-lg shadow-sky-500/30 active:scale-95 transition-all relative" title="Hablar con la IA en directo con voz en castellano">
           <span class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#0b1329] animate-pulse"></span>
           <i data-lucide="audio-lines" class="w-4 h-4"></i>
