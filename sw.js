@@ -1,5 +1,5 @@
-// VoiceNote AI - Service Worker for Offline PWA Support
-const CACHE_NAME = 'voicenote-ai-v2'; // Actualizado a v2 para forzar la recarga del nuevo app.js
+// VoiceNote AI - Service Worker v3
+const CACHE_NAME = 'voicenote-ai-v3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
