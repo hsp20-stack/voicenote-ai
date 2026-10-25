@@ -304,20 +304,19 @@ async function fetchRealAiResponse(query) {
   const cleanQ = query.trim();
   const lower  = cleanQ.toLowerCase();
 
-  // Matemáticas y trigonometría
-  if (lower.includes('trigono') || lower.includes('seno') || lower.includes('coseno') ||
-      lower.includes('tangente') || lower.includes('ecuacion') || lower.includes('ecuación') ||
-      lower.includes('raiz') || lower.includes('raíz') || lower.includes('potencia')) {
-    return solveTrigonometryOrMath(cleanQ);
-  }
-
-  // Viajes económicos
-  if (lower.includes('viaje') || lower.includes('viajar') || lower.includes('itinerario') ||
-      lower.includes('roma') || lower.includes('parís') || lower.includes('paris') ||
-      lower.includes('londres') || lower.includes('barato') || lower.includes('economico') ||
-      lower.includes('económico')) {
-    return generateCheapTravelPlan(cleanQ);
-  }
+  // Detectar si es una pregunta de matemáticas / ciencias exactas
+  const isMath = lower.includes('trigono')    || lower.includes('seno')       || lower.includes('coseno')    ||
+                 lower.includes('tangente')   || lower.includes('ecuacion')   || lower.includes('ecuación')  ||
+                 lower.includes('raiz')       || lower.includes('raíz')       || lower.includes('potencia')  ||
+                 lower.includes('derivad')    || lower.includes('integral')   || lower.includes('límite')    ||
+                 lower.includes('limite')     || lower.includes('álgebra')    || lower.includes('algebra')   ||
+                 lower.includes('fraccion')   || lower.includes('fracción')   || lower.includes('porcentaje')||
+                 lower.includes('probabilidad')|| lower.includes('geometr')   || lower.includes('vector')    ||
+                 lower.includes('matriz')     || lower.includes('función')    || lower.includes('funcion')   ||
+                 lower.includes('logaritmo')  || lower.includes('exponencial')|| lower.includes('número')    ||
+                 lower.includes('numero')     || lower.includes('calcul')     || lower.includes('formula')   ||
+                 lower.includes('fórmula')    || lower.includes('teorema')    || lower.includes('demostr')   ||
+                 /[\d]\s*[\+\-\*\/\^=]/.test(cleanQ);
 
   // PDF
   if (lower.includes('pdf') || lower.includes('descargar informe')) {
@@ -343,11 +342,37 @@ async function fetchRealAiResponse(query) {
     };
   }
 
-  // IA Generativa — Pollinations API
+  // Viajes económicos
+  if (lower.includes('viaje') || lower.includes('viajar') || lower.includes('itinerario') ||
+      lower.includes('roma') || lower.includes('parís') || lower.includes('paris') ||
+      lower.includes('londres') || lower.includes('barato') || lower.includes('economico') ||
+      lower.includes('económico')) {
+    return generateCheapTravelPlan(cleanQ);
+  }
+
+  // IA Generativa — Pollinations API con prompt especializado según el tipo de pregunta
   try {
-    const systemPrompt = `Eres VoiceNote AI, un asistente creado por Hugo SP Studios. Responde SIEMPRE en castellano de España. Sé directo, claro y útil. Sin frases de relleno. Ve directo a la respuesta.`;
+    let systemPrompt;
+
+    if (isMath) {
+      systemPrompt = `Eres VoiceNote AI, un asistente matemático experto creado por Hugo SP Studios.
+Responde SIEMPRE en castellano de España.
+REGLAS OBLIGATORIAS para matemáticas:
+1. USA SIEMPRE notación LaTeX para cualquier símbolo matemático.
+2. Ecuaciones en bloque (en su propia línea): $$...$$
+   Ejemplo: $$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$
+3. Expresiones dentro del texto: $...$
+   Ejemplo: La solución es $x = 30°$ o $x = \\frac{\\pi}{6}$ rad.
+4. Usa: \\sin, \\cos, \\tan, \\frac{a}{b}, \\sqrt{x}, \\pi, \\int, \\sum, \\infty, \\pm, \\cdot, \\leq, \\geq, \\neq, ^{exp}, _{sub}
+5. Explica paso a paso con encabezados ### Paso 1, ### Paso 2, etc.
+6. Al final añade la fórmula o identidad clave relevante.
+7. SIN frases de relleno. Ve directo al cálculo.`;
+    } else {
+      systemPrompt = `Eres VoiceNote AI, un asistente inteligente creado por Hugo SP Studios. Responde SIEMPRE en castellano de España. Sé directo, claro y útil. Sin frases de relleno. Ve directo a la respuesta. Si hay datos concretos (precios, fechas, estadísticas), inclúyelos.`;
+    }
+
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 6000);
+    const timer = setTimeout(() => controller.abort(), 8000);
 
     const res = await fetch('https://text.pollinations.ai/', {
       method: 'POST',
@@ -368,7 +393,13 @@ async function fetchRealAiResponse(query) {
     if (res.ok) {
       const answer = await res.text();
       if (answer && answer.trim().length > 3 && !answer.includes('Rate limit')) {
-        const speechVersion = answer.trim().replace(/[*_#•`$\\]/g, '').slice(0, 400);
+        // Para el speech, limpiar LaTeX y markdown
+        const speechVersion = answer.trim()
+          .replace(/\$\$[\s\S]*?\$\$/g, '')
+          .replace(/\$[^$]*?\$/g, '')
+          .replace(/[*_#•`\\]/g, '')
+          .replace(/\n+/g, '. ')
+          .slice(0, 400);
         return { text: answer.trim(), speechText: speechVersion };
       }
     }
@@ -376,7 +407,8 @@ async function fetchRealAiResponse(query) {
     console.warn('API fallback:', err.message);
   }
 
-  // Respuesta local directa
+  // Fallback local
+  if (isMath) return solveTrigonometryOrMath(cleanQ);
   return getDirectKnowledgeAnswer(cleanQ);
 }
 
