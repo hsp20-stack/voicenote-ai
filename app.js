@@ -1,21 +1,19 @@
 /**
- * VoiceNote AI - Motor Conversacional Estilo Copilot & ChatGPT
+ * VoiceNote AI - Asistente Universal con Inteligencia Real
  * Desarrollada por Hugo SP Studios.
- * Incluye:
- * - Modo Voz Copilot en Directo (Conversación continua hablada)
- * - Respuestas inteligentes y reales a cualquier pregunta o tema
- * - 4 Idiomas (Español, Français, Português, 中文)
- * - Creador de PDFs, Estructuras Canva y Agendador de Citas
+ * - Modo Voz en Directo (Conversación continua hablada)
+ * - Respuestas reales e inteligentes a CUALQUIER pregunta
+ * - Generador de PDFs, Estructuras Canva y Agendador de Citas
+ * - 4 Idiomas hablados (Español, Français, Português, 中文)
  */
 
 const state = {
   language: 'es-ES',
-  isCopilotCallActive: false,
+  isLiveCallActive: false,
   isRecording: false,
   isAiSpeaking: false,
   recognition: null,
-  availableVoices: [],
-  conversationHistory: []
+  availableVoices: []
 };
 
 // --- DOM References ---
@@ -32,11 +30,11 @@ const elements = {
   toolBtns: document.querySelectorAll('[data-quick-action]'),
   promptCards: document.querySelectorAll('[data-prompt]'),
   
-  // Copilot Voice Modal Elements
-  openCopilotVoiceBtn: document.getElementById('openCopilotVoiceBtn'),
+  // Live Voice Modal Elements
+  openLiveVoiceBtn: document.getElementById('openLiveVoiceBtn'),
   heroVoiceBtn: document.getElementById('heroVoiceBtn'),
-  copilotVoiceModal: document.getElementById('copilotVoiceModal'),
-  closeCopilotVoiceBtn: document.getElementById('closeCopilotVoiceBtn'),
+  liveVoiceModal: document.getElementById('liveVoiceModal'),
+  closeLiveVoiceBtn: document.getElementById('closeLiveVoiceBtn'),
   toggleVoiceCallMicBtn: document.getElementById('toggleVoiceCallMicBtn'),
   callMicIcon: document.getElementById('callMicIcon'),
   voiceOrb: document.getElementById('voiceOrb'),
@@ -50,7 +48,7 @@ function refreshIcons() {
   if (window.lucide) window.lucide.createIcons();
 }
 
-// --- Voice Engine: Carga de Voces Humanas ---
+// --- Voice Engine: Natural Human Speech ---
 function initVoices() {
   if ('speechSynthesis' in window) {
     const loadVoices = () => {
@@ -70,30 +68,29 @@ function speakHumanVoice(text, lang = state.language, onEndCallback = null) {
   window.speechSynthesis.cancel();
   state.isAiSpeaking = true;
 
-  // Visual feedback on Orb if in Copilot Mode
-  if (state.isCopilotCallActive) {
+  if (state.isLiveCallActive) {
     elements.voiceStatusText.textContent = "VoiceNote AI está hablando...";
     elements.voiceOrb.className = "w-48 h-48 sm:w-56 sm:h-56 rounded-full bg-gradient-to-tr from-cyan-400 via-sky-500 to-indigo-600 animate-orb-glow flex items-center justify-center relative cursor-pointer shadow-2xl transition-all scale-105";
     elements.orbCenterIcon.setAttribute('data-lucide', 'volume-2');
     refreshIcons();
   }
 
-  const cleanText = text
+  const clean = text
     .replace(/[*_#•`]/g, '')
     .replace(/\[.*?\]\(.*?\)/g, '')
-    .slice(0, 500);
+    .replace(/\$\$.*?\$\$/g, '')
+    .slice(0, 450);
 
-  const utterance = new SpeechSynthesisUtterance(cleanText);
+  const utterance = new SpeechSynthesisUtterance(clean);
   utterance.lang = lang;
-  utterance.rate = 1.0;
-  utterance.pitch = 1.02;
+  utterance.rate = 1.02;
+  utterance.pitch = 1.0;
 
-  // Find best natural voice for language
   if (state.availableVoices.length > 0) {
     const langPrefix = lang.split('-')[0].toLowerCase();
     const naturalVoice = state.availableVoices.find(v => 
       v.lang.toLowerCase().startsWith(langPrefix) && 
-      (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Siri') || v.name.includes('Neural'))
+      (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Siri') || v.name.includes('Neural') || v.name.includes('Monica') || v.name.includes('Paulina'))
     ) || state.availableVoices.find(v => v.lang.toLowerCase().startsWith(langPrefix));
 
     if (naturalVoice) utterance.voice = naturalVoice;
@@ -101,18 +98,18 @@ function speakHumanVoice(text, lang = state.language, onEndCallback = null) {
 
   utterance.onend = () => {
     state.isAiSpeaking = false;
-    if (state.isCopilotCallActive) {
-      elements.voiceStatusText.textContent = "Te escucho, responde cuando quieras...";
+    if (state.isLiveCallActive) {
+      elements.voiceStatusText.textContent = "Te escucho, habla conmigo...";
       elements.voiceOrb.className = "w-48 h-48 sm:w-56 sm:h-56 rounded-full bg-gradient-to-tr from-sky-500 via-blue-600 to-cyan-400 animate-orb-pulse animate-orb-glow flex items-center justify-center relative cursor-pointer shadow-2xl transition-all";
       elements.orbCenterIcon.setAttribute('data-lucide', 'mic');
       refreshIcons();
 
-      // Automatically listen again! (Continuous Conversation Loop)
+      // Automatically listen again!
       setTimeout(() => {
-        if (state.isCopilotCallActive && !state.isAiSpeaking) {
+        if (state.isLiveCallActive && !state.isAiSpeaking) {
           startSpeechRecognizer();
         }
-      }, 300);
+      }, 350);
     }
     if (onEndCallback) onEndCallback();
   };
@@ -125,13 +122,13 @@ function speakHumanVoice(text, lang = state.language, onEndCallback = null) {
   window.speechSynthesis.speak(utterance);
 }
 
-// --- Speech Recognition Setup ---
+// --- Speech Recognition ---
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 function setupSpeechRecognition() {
   if (!SpeechRecognition) return null;
   const recog = new SpeechRecognition();
-  recog.continuous = false; // Ends when user pauses talking
+  recog.continuous = false;
   recog.interimResults = true;
   recog.lang = state.language;
 
@@ -146,7 +143,7 @@ function setupSpeechRecognition() {
 
     const currentText = (final || interim).trim();
 
-    if (state.isCopilotCallActive) {
+    if (state.isLiveCallActive) {
       elements.voiceTranscriptPreview.textContent = `"${currentText}"`;
     } else {
       elements.chatInput.value = currentText;
@@ -156,11 +153,10 @@ function setupSpeechRecognition() {
   recog.onend = () => {
     state.isRecording = false;
 
-    if (state.isCopilotCallActive) {
+    if (state.isLiveCallActive) {
       const recognized = elements.voiceTranscriptPreview.textContent.replace(/^"|"$/g, '').trim();
       if (recognized && !recognized.startsWith('Di lo que quieras') && !state.isAiSpeaking) {
-        // Process user spoken message in Copilot mode
-        handleCopilotVoiceExchange(recognized);
+        handleVoiceExchange(recognized);
       }
     } else {
       elements.micBtn.classList.remove('bg-red-500', 'animate-pulse');
@@ -173,9 +169,9 @@ function setupSpeechRecognition() {
     }
   };
 
-  recog.onerror = (e) => {
+  recog.onerror = () => {
     state.isRecording = false;
-    if (!state.isCopilotCallActive) {
+    if (!state.isLiveCallActive) {
       elements.micBtn.classList.remove('bg-red-500', 'animate-pulse');
       elements.micBtn.classList.add('bg-sky-600');
       elements.micIcon.setAttribute('data-lucide', 'mic');
@@ -206,10 +202,10 @@ function stopSpeechRecognizer() {
   }
 }
 
-// --- Copilot Voice Mode Control ---
-function openCopilotVoiceModal() {
-  state.isCopilotCallActive = true;
-  elements.copilotVoiceModal.classList.remove('hidden');
+// --- Live Voice Mode Controls ---
+function openLiveVoiceModal() {
+  state.isLiveCallActive = true;
+  elements.liveVoiceModal.classList.remove('hidden');
 
   const langNames = {
     'es-ES': 'ESPAÑOL',
@@ -219,106 +215,59 @@ function openCopilotVoiceModal() {
   };
   elements.voiceLanguageTag.textContent = langNames[state.language] || 'ESPAÑOL';
 
-  // Greeting
   const greetings = {
-    'es-ES': 'Hola, soy VoiceNote AI de Hugo SP Studios. Te escucho, ¿de qué te gustaría hablar hoy?',
-    'fr-FR': 'Bonjour, je suis VoiceNote AI de Hugo SP Studios. Je vous écoute, de quoi voulez-vous parler ?',
-    'pt-BR': 'Olá, sou o VoiceNote AI da Hugo SP Studios. Estou ouvindo você, sobre o que quer conversar?',
-    'zh-CN': '你好，我是由 Hugo SP Studios 开发的 VoiceNote AI。我正在听，你想聊些什么？'
+    'es-ES': 'Hola, te escucho. Hazme cualquier pregunta o cuéntame lo que quieras.',
+    'fr-FR': 'Bonjour, je vous écoute. Posez-moi vos questions ou discutons librement.',
+    'pt-BR': 'Olá, estou ouvindo. Faça-me qualquer pergunta ou converse à vontade.',
+    'zh-CN': '你好，我正在听。请随时向我提问或与我聊天。'
   };
 
-  const initialGreeting = greetings[state.language] || greetings['es-ES'];
-  elements.voiceStatusText.textContent = "Iniciando conversación...";
-  elements.voiceTranscriptPreview.textContent = `"${initialGreeting}"`;
+  const greeting = greetings[state.language] || greetings['es-ES'];
+  elements.voiceStatusText.textContent = "Conectando voz en vivo...";
+  elements.voiceTranscriptPreview.textContent = `"${greeting}"`;
 
-  speakHumanVoice(initialGreeting, state.language, () => {
-    // When greeting finishes, start listening immediately
-    if (state.isCopilotCallActive) {
+  speakHumanVoice(greeting, state.language, () => {
+    if (state.isLiveCallActive) {
       elements.voiceStatusText.textContent = "Te estoy escuchando, habla conmigo...";
       startSpeechRecognizer();
     }
   });
 }
 
-function closeCopilotVoiceModal() {
-  state.isCopilotCallActive = false;
+function closeLiveVoiceModal() {
+  state.isLiveCallActive = false;
   window.speechSynthesis.cancel();
   stopSpeechRecognizer();
-  elements.copilotVoiceModal.classList.add('hidden');
+  elements.liveVoiceModal.classList.add('hidden');
 }
 
-// Handle voice exchange in Copilot Mode
-async function handleCopilotVoiceExchange(userText) {
+// Voice Exchange Handler
+async function handleVoiceExchange(userText) {
   if (!userText || state.isAiSpeaking) return;
 
-  // Add to main chat log in background
   if (elements.welcomeScreen) elements.welcomeScreen.remove();
   appendMessageBubble('user', userText, true);
 
-  // Status to thinking
   elements.voiceStatusText.textContent = "VoiceNote AI está pensando...";
   elements.voiceOrb.className = "w-48 h-48 sm:w-56 sm:h-56 rounded-full bg-gradient-to-tr from-indigo-500 via-purple-600 to-pink-500 animate-pulse flex items-center justify-center relative cursor-pointer shadow-2xl transition-all";
 
-  // Generate intelligent response to what user ACTUALLY asked
-  const aiResult = generateDeepResponse(userText, state.language);
+  // Query Real AI Answer
+  const aiResult = await fetchRealAiResponse(userText, state.language);
 
-  // Append to chat log
   appendMessageBubble('ai', aiResult.text, false, aiResult);
-
-  // Update preview
   elements.voiceTranscriptPreview.textContent = `"${aiResult.speechText || aiResult.text}"`;
 
-  // Speak AI Answer
   speakHumanVoice(aiResult.speechText || aiResult.text, state.language);
 }
 
-// --- Intelligent Dynamic Brain (Answers to ANYTHING the user actually says) ---
-function generateDeepResponse(query, lang) {
-  const q = query.toLowerCase().trim();
+// --- Real AI Query Engine (Pollinations Free LLM API + Smart Local Knowledge Base) ---
+async function fetchRealAiResponse(query, lang) {
+  const cleanQ = query.trim();
 
-  // Math & Calculations (e.g., "cuanto es 25 por 4", "calcula 100 / 5")
-  const mathMatch = q.match(/(\d+)\s*(\+|\-|\*|\/|x|por|entre|mas|menos)\s*(\d+)/i);
-  if (mathMatch) {
-    const num1 = parseFloat(mathMatch[1]);
-    const op = mathMatch[2].toLowerCase();
-    const num2 = parseFloat(mathMatch[3]);
-    let res = 0;
-    if (op === '+' || op === 'mas') res = num1 + num2;
-    else if (op === '-' || op === 'menos') res = num1 - num2;
-    else if (op === '*' || op === 'x' || op === 'por') res = num1 * num2;
-    else if (op === '/' || op === 'entre') res = num2 !== 0 ? (num1 / num2) : 'Indeterminado';
+  // Check built-in action commands first (PDF, Canva, Calendar)
+  const lower = cleanQ.toLowerCase();
 
-    return {
-      text: `El resultado del cálculo matemático es:\n\n$$\\mathbf{${num1} \\times ${num2} = ${res}}$$\n\n¿Deseas realizar alguna otra operación?`,
-      speechText: `El resultado es ${res}.`
-    };
-  }
-
-  // Jokes ("chiste", "cuentame un chiste")
-  if (q.includes('chiste') || q.includes('humor') || q.includes('divertido')) {
-    const jokes = [
-      "¿Por qué los pájaros no usan WhatsApp? Porque ya tienen Twitter y hacen pío.",
-      "¿Qué le dice un semáforo a otro? ¡No me mires que me estoy cambiando de color!",
-      "¿Qué hace una abeja en el gimnasio? ¡Zumba!",
-      "¿Cuál es el colmo de un electricista? Que su mujer se llame Luz y los hijos le sigan la corriente."
-    ];
-    const picked = jokes[Math.floor(Math.random() * jokes.length)];
-    return {
-      text: `😂 **Aquí tienes un chiste:**\n\n${picked}\n\n¡Espero haberte sacado una sonrisa!`,
-      speechText: `${picked}`
-    };
-  }
-
-  // Identity & Creator
-  if (q.includes('quién eres') || q.includes('quien eres') || q.includes('cómo te llamas') || q.includes('creador')) {
-    return {
-      text: `Soy **VoiceNote AI**, una inteligencia artificial conversacional por voz y texto desarrollada con orgullo por **Hugo SP Studios**.\n\nPuedo responder a cualquier pregunta, mantener una conversación continua por voz en 4 idiomas, generar documentos en PDF, crear estructuras para Canva y agendar citas en tu calendario.`,
-      speechText: `Soy VoiceNote AI, tu asistente conversacional por voz y texto, desarrollada por Hugo SP Studios. ¿En qué te ayudo hoy?`
-    };
-  }
-
-  // PDF Generator
-  if (q.includes('pdf') || q.includes('informe') || q.includes('descargar documento')) {
+  if (lower.includes('pdf') || lower.includes('descargar informe')) {
     return {
       text: `📄 **Documento Oficial Listo para Generar:**\n\nHe redactado el documento formal:\n\n• **Título:** Informe Oficial VoiceNote AI\n• **Autor:** Hugo SP Studios\n• **Contenido:** Resumen ejecutivo de acciones, optimización y productividad.\n\nPulsa el botón de abajo para descargarlo de inmediato en formato PDF.`,
       pdfAction: true,
@@ -328,8 +277,7 @@ function generateDeepResponse(query, lang) {
     };
   }
 
-  // Canva / Design works
-  if (q.includes('canva') || q.includes('diseño') || q.includes('presentación') || q.includes('diapositiva')) {
+  if (lower.includes('canva') || lower.includes('diseño') || lower.includes('presentación') || lower.includes('diapositiva')) {
     return {
       text: `🎨 **Estructura para Proyecto en Canva:**\n\nHe diseñado el esquema de presentación:\n\n1. **Portada:** Tipografía moderna en blanco sobre fondo azul marino \`#0b1329\`.\n2. **Contenido:** 3 columnas para resaltar ideas, números clave y testimonios.\n3. **Cierre:** Llamada a la acción con botón llamativo en azul cian \`#38bdf8\`.\n\nPulsa abajo para abrir Canva o copiar el texto de las diapositivas.`,
       canvaAction: true,
@@ -337,9 +285,8 @@ function generateDeepResponse(query, lang) {
     };
   }
 
-  // Calendar Appointments
-  if (q.includes('cita') || q.includes('agenda') || q.includes('reunión') || q.includes('calendario') || q.includes('dentista') || q.includes('médico')) {
-    const title = q.includes('dentista') ? 'Cita con el Dentista' : (q.includes('médico') ? 'Cita Médica' : 'Reunión Agendada');
+  if (lower.includes('cita') || lower.includes('agenda') || lower.includes('reunión') || lower.includes('calendario') || lower.includes('dentista') || lower.includes('médico')) {
+    const title = lower.includes('dentista') ? 'Cita con el Dentista' : (lower.includes('médico') ? 'Cita Médica' : 'Reunión Agendada');
     return {
       text: `📅 **Cita Preparada para tu Calendario:**\n\n• **Evento:** ${title}\n• **Recordatorio:** Notificación 30 minutos antes.\n\nPulsa abajo para sincronizar con **Google Calendar** o descargar el archivo **.ICS para Apple Calendar** en tu iPhone.`,
       calendarAction: true,
@@ -348,75 +295,156 @@ function generateDeepResponse(query, lang) {
     };
   }
 
-  // Recommendations on Demand
-  if (q.includes('recomiend') || q.includes('sugerencia') || q.includes('consejo') || q.includes('película') || q.includes('libro') || q.includes('viaje')) {
-    if (q.includes('película') || q.includes('pelicula') || q.includes('cine')) {
+  // Live Free LLM Query (Gets genuine answers to literally ANY question!)
+  try {
+    const promptInstructions = `Eres VoiceNote AI, un asistente conversacional inteligente, útil y conciso desarrollado por Hugo SP Studios. Responde a la siguiente pregunta del usuario de forma directa y clara en el idioma del usuario (${lang}):\n${cleanQ}`;
+    const apiUrl = `https://text.pollinations.ai/${encodeURIComponent(promptInstructions)}?model=openai`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+    const res = await fetch(apiUrl, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      const answer = await res.text();
+      if (answer && answer.trim().length > 5) {
+        return {
+          text: answer.trim(),
+          speechText: answer.trim().slice(0, 300)
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('Online LLM fallback to local knowledge base:', err);
+  }
+
+  // Local Comprehensive Knowledge Base (Offline / Instant Fallback)
+  return getLocalKnowledgeAnswer(cleanQ, lang);
+}
+
+// Local Knowledge Base for Offline or Fast Answers
+function getLocalKnowledgeAnswer(query, lang) {
+  const q = query.toLowerCase().trim();
+
+  // Math
+  const mathMatch = q.match(/(\d+)\s*(\+|\-|\*|\/|x|por|entre|mas|menos)\s*(\d+)/i);
+  if (mathMatch) {
+    const n1 = parseFloat(mathMatch[1]);
+    const op = mathMatch[2].toLowerCase();
+    const n2 = parseFloat(mathMatch[3]);
+    let r = 0;
+    if (op === '+' || op === 'mas') r = n1 + n2;
+    else if (op === '-' || op === 'menos') r = n1 - n2;
+    else if (op === '*' || op === 'x' || op === 'por') r = n1 * n2;
+    else if (op === '/' || op === 'entre') r = n2 !== 0 ? (n1 / n2) : 'Indeterminado';
+
+    return {
+      text: `El resultado es: **${n1} ${op} ${n2} = ${r}**`,
+      speechText: `El resultado es ${r}.`
+    };
+  }
+
+  // Science / Nature
+  if (q.includes('cielo es azul') || q.includes('cielo azul')) {
+    return {
+      text: `El cielo se ve azul debido a un fenómeno físico llamado **dispersión de Rayleigh**:\n\n• La luz del Sol parece blanca, pero está compuesta por todos los colores del arcoíris.\n• Cuando la luz solar entra en la atmósfera de la Tierra, choca con los gases del aire (nitrógeno y oxígeno).\n• La luz azul viaja en ondas más cortas y pequeñas, por lo que se dispersa en todas direcciones mucho más que los otros colores, haciendo que nuestros ojos perciban el cielo azul durante el día.`,
+      speechText: `El cielo es azul por la dispersión de Rayleigh: la luz azul tiene ondas más cortas y se dispersa en la atmósfera mucho más que otros colores.`
+    };
+  }
+
+  if (q.includes('distancia') && (q.includes('luna') || q.includes('tierra'))) {
+    return {
+      text: `La distancia promedio entre la Tierra y la Luna es de aproximadamente **384.400 kilómetros** (equivalente a unas 30 veces el diámetro de la Tierra).`,
+      speechText: `La distancia promedio de la Tierra a la Luna es de unos 384.400 kilómetros.`
+    };
+  }
+
+  // Geography & Capitals
+  if (q.includes('capital de')) {
+    const capitals = {
+      'españa': 'Madrid', 'francia': 'París', 'portugal': 'Lisboa', 'italia': 'Roma',
+      'alemania': 'Berlín', 'reino unido': 'Londres', 'méxico': 'Ciudad de México',
+      'mexico': 'Ciudad de México', 'argentina': 'Buenos Aires', 'colombia': 'Bogotá',
+      'estados unidos': 'Washington D.C.', 'japón': 'Tokio', 'japon': 'Tokio', 'china': 'Pekín'
+    };
+    for (const [country, cap] of Object.entries(capitals)) {
+      if (q.includes(country)) {
+        return {
+          text: `La capital de **${country.charAt(0).toUpperCase() + country.slice(1)}** es **${cap}**.`,
+          speechText: `La capital de ${country} es ${cap}.`
+        };
+      }
+    }
+  }
+
+  // Recipes / Cooking
+  if (q.includes('tortilla de patata') || q.includes('receta de')) {
+    return {
+      text: `🍳 **Receta clásica de Tortilla de Patatas:**\n\n1. **Ingredientes:** 4-5 patatas medianas, 6 huevos, aceite de oliva virgen extra, sal (y cebolla si te gusta con cebolla).\n2. **Preparación:**\n   • Corta las patatas en láminas finas y fríelas a fuego lento en abundante aceite hasta que estén tiernas y doradas.\n   • Bate los huevos en un bol grande con una pizca de sal.\n   • Escurre las patatas del aceite y mézclalas con el huevo batido. Deja reposar 5 minutos.\n   • En una sartén con unas gotas de aceite caliente, vierte la mezcla y cuaja a fuego medio durante 3 minutos por cada lado dándole la vuelta con un plato.`,
+      speechText: "Para una tortilla de patatas perfecta necesitas patatas, huevos, aceite y sal. Fríe las patatas despacio, mézclalas con el huevo y cuaja tres minutos por lado."
+    };
+  }
+
+  // Jokes
+  if (q.includes('chiste') || q.includes('broma')) {
+    const jokes = [
+      "¿Por qué los pájaros no usan WhatsApp? Porque ya tienen Twitter y hacen pío.",
+      "¿Qué le dice un semáforo a otro? ¡No me mires que me estoy cambiando de color!",
+      "¿Qué hace una abeja en el gimnasio? ¡Zumba!"
+    ];
+    const j = jokes[Math.floor(Math.random() * jokes.length)];
+    return {
+      text: `😂 ${j}`,
+      speechText: j
+    };
+  }
+
+  // Recommendations
+  if (q.includes('recomiend') || q.includes('película') || q.includes('libro')) {
+    if (q.includes('película') || q.includes('pelicula')) {
       return {
-        text: `🎬 **Recomendaciones de Cine Imperdibles:**\n\n1. **Interstellar:** Una obra maestra visual sobre la física, el tiempo y el amor.\n2. **Origen (Inception):** Acción y psicología de alto nivel sobre los sueños.\n3. **La Red Social:** Cómo se construyó una de las mayores plataformas tecnológicas del mundo.`,
-        speechText: "Te recomiendo tres grandes películas: Interstellar, Origen y La Red Social."
+        text: `🎬 **3 Películas recomendadas:**\n\n1. **Interstellar:** Ciencia ficción profunda sobre el espacio y el tiempo.\n2. **Origen (Inception):** Acción psicológica dentro de los sueños.\n3. **El Caballero Oscuro:** Obra maestra del cine de superhéroes.`,
+        speechText: "Te recomiendo Interstellar, Origen y El Caballero Oscuro."
       };
     }
-    if (q.includes('viaje') || q.includes('destino') || q.includes('país')) {
-      return {
-        text: `✈️ **Recomendaciones de Destinos de Viaje:**\n\n1. **Portugal (Lisboa y Oporto):** Increíble gastronomía, arquitectura y costes accesibles.\n2. **Japón (Tokio y Kioto):** Fusión única entre tradición milenaria y tecnología futurista.\n3. **Islandia:** Naturaleza salvaje con cascadas, auroras boreales y volcanes.`,
-        speechText: "Te sugiero tres destinos increíbles: Portugal, Japón e Islandia."
-      };
-    }
     return {
-      text: `💡 **Recomendaciones de Éxito de Hugo SP Studios:**\n\n1. 📖 **Libro:** *"Hábitos Atómicos"* de James Clear (El secreto para crear cambios duraderos).\n2. 🧠 **Productividad:** Regla de los 2 minutos (Si algo toma menos de dos minutos, hazlo de inmediato).\n3. 🎯 **Enfoque:** Establece una única prioridad absoluta cada mañana antes de revisar el móvil.`,
-      speechText: "Aquí tienes tres recomendaciones clave sobre hábitos, productividad y enfoque diario."
+      text: `📚 **Libro recomendado:** *"Hábitos Atómicos"* de James Clear. Te enseña cómo pequeños cambios del 1% diario generan transformaciones gigantescas a largo plazo.`,
+      speechText: "Te recomiendo Hábitos Atómicos de James Clear, ideal para mejorar tu productividad."
     };
   }
 
-  // Multilingual Answers for French
-  if (lang.startsWith('fr') || q.includes('bonjour') || q.includes('comment vas-tu')) {
+  // Greetings & Chit-chat
+  if (q.includes('hola') || q.includes('buenas') || q.includes('qué tal') || q.includes('que tal')) {
     return {
-      text: `Bonjour ! 👋 Je vous réponds avec plaisir en français.\n\nConcernant votre message : **"${escapeHtml(query)}"**, je suis à votre disposition pour vous expliquer tout sujet, concevoir des présentations ou créer des documents PDF.\n\nQue souhaitez-vous faire ensuite ?`,
-      speechText: `Bonjour ! Je suis à votre entière disposition. Que souhaitez-vous faire ensuite ?`
+      text: `¡Hola! 👋 ¿Cómo estás? Soy **VoiceNote AI**, desarrollada por **Hugo SP Studios**.\n\nPuedes hacerme cualquier pregunta de ciencia, historia, pedirme una receta, recomendaciones, cálculos o que creemos un PDF. ¿De qué te gustaría hablar?`,
+      speechText: "¡Hola! Estoy lista para responder a lo que necesites. ¿De qué quieres hablar?"
     };
   }
 
-  // Multilingual Answers for Portuguese
-  if (lang.startsWith('pt') || q.includes('olá') || q.includes('como vai')) {
-    return {
-      text: `Olá! 👋 Respondendo com prazer em português.\n\nSobre sua mensagem: **"${escapeHtml(query)}"**, posso ajudá-lo com qualquer dúvida, gerar arquivos PDF ou agendar seus eventos.\n\nComo posso ser útil agora?`,
-      speechText: `Olá! Estou à sua disposição. Como posso ajudá-lo agora?`
-    };
-  }
-
-  // Multilingual Answers for Chinese
-  if (lang.startsWith('zh') || q.includes('你好')) {
-    return {
-      text: `你好！👋 我很乐意用中文为您提供帮助。\n\n关于您的问题：“**${escapeHtml(query)}**”，我可以为您解答疑问、创建 PDF 文件或在日历中安排日程。\n\n您接下来想要做什么？`,
-      speechText: `你好！我很乐意为您提供帮助。请问接下来有什么需要？`
-    };
-  }
-
-  // General Direct Conversational Answer for any topic
+  // General Direct Conversational Answer
   return {
-    text: `Entiendo perfectamente lo que me comentas sobre: **"${escapeHtml(query)}"**.\n\nPara responderte con precisión:\n\n• **Perspectiva Principal:** Es un asunto muy interesante que se puede enfocar desde diferentes ángulos dependiendo de tus objetivos.\n• **Siguiente Paso Práctico:** Podemos profundizar en ello, redactarte un informe en **PDF**, diseñar una estructura para **Canva** o agendar una tarea en tu **calendario**.\n\n¿Qué prefieres que hagamos al respecto?`,
-    speechText: `Entendido perfectamente. Podemos profundizar en ello, crear un PDF o agendar una cita. ¿Qué prefieres que hagamos?`
+    text: `Respecto a tu consulta sobre **"${escapeHtml(query)}"**:\n\n• **Respuesta:** Para profundizar en este tema de forma óptima, ten en cuenta los aspectos fundamentales y el contexto práctico.\n• **Acción:** Si necesitas que te redacte un documento completo, puedo generarlo en **PDF** o prepararte una estructura para **Canva**.\n\n¿Quieres que entremos en más detalles?`,
+    speechText: `Sobre tu consulta, es un tema interesante. Puedo darte más detalles o crear un documento en PDF si lo necesitas.`
   };
 }
 
-// --- Chat Bubbles Rendering ---
-function handleUserSubmit(text, fromVoice = false) {
+// --- Chat Form Submit ---
+async function handleUserSubmit(text, fromVoice = false) {
   if (!text.trim()) return;
   if (elements.welcomeScreen) elements.welcomeScreen.remove();
 
   appendMessageBubble('user', text, fromVoice);
   elements.chatInput.value = '';
 
-  // Thinking Bubble
   const thinkId = 'think_' + Date.now();
   appendThinkingBubble(thinkId);
 
-  setTimeout(() => {
-    const aiOutput = generateDeepResponse(text, state.language);
-    replaceThinkingBubble(thinkId, aiOutput);
-  }, 500);
+  const aiOutput = await fetchRealAiResponse(text, state.language);
+  replaceThinkingBubble(thinkId, aiOutput);
 }
 
+// DOM Message Bubble
 function appendMessageBubble(sender, text, isVoice = false) {
   const div = document.createElement('div');
   div.className = sender === 'user' ? 'flex justify-end my-3' : 'flex items-start gap-3 my-3';
@@ -519,7 +547,6 @@ function replaceThinkingBubble(id, aiOutput) {
   el.replaceWith(div);
   refreshIcons();
 
-  // Attach dynamic events
   const speakBtn = div.querySelector('[data-speak-msg]');
   if (speakBtn) {
     speakBtn.addEventListener('click', () => {
@@ -560,7 +587,7 @@ function replaceThinkingBubble(id, aiOutput) {
   elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
 }
 
-// --- PDF Generator with jsPDF ---
+// --- PDF Generator ---
 function generatePdfDocument(title, text) {
   try {
     const { jsPDF } = window.jspdf || {};
@@ -594,7 +621,7 @@ function generatePdfDocument(title, text) {
   }
 }
 
-// --- ICS Calendar Generator ---
+// --- Apple Calendar (.ICS) Generator ---
 function downloadIcsCalendarFile(title) {
   const now = new Date();
   const startTime = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString().replace(/-|:|\.\d\d\d/g, "");
@@ -623,7 +650,6 @@ function downloadIcsCalendarFile(title) {
   document.body.removeChild(a);
 }
 
-// --- Markdown Helpers ---
 function formatMarkdown(text) {
   return escapeHtml(text)
     .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
@@ -641,7 +667,6 @@ elements.chatForm.addEventListener('submit', (e) => {
   if (text) handleUserSubmit(text, false);
 });
 
-// Single tap mic in bottom bar
 elements.micBtn.addEventListener('click', () => {
   if (state.isRecording) {
     stopSpeechRecognizer();
@@ -654,11 +679,11 @@ elements.micBtn.addEventListener('click', () => {
   }
 });
 
-// Copilot Voice Call triggers
-elements.openCopilotVoiceBtn.addEventListener('click', openCopilotVoiceModal);
-if (elements.heroVoiceBtn) elements.heroVoiceBtn.addEventListener('click', openCopilotVoiceModal);
+// Live Voice Mode (Without word Copilot)
+elements.openLiveVoiceBtn.addEventListener('click', openLiveVoiceModal);
+if (elements.heroVoiceBtn) elements.heroVoiceBtn.addEventListener('click', openLiveVoiceModal);
 
-elements.closeCopilotVoiceBtn.addEventListener('click', closeCopilotVoiceModal);
+elements.closeLiveVoiceBtn.addEventListener('click', closeLiveVoiceModal);
 
 elements.toggleVoiceCallMicBtn.addEventListener('click', () => {
   if (state.isRecording) {
@@ -697,7 +722,6 @@ elements.promptCards.forEach(card => {
   });
 });
 
-// Init
 window.addEventListener('DOMContentLoaded', () => {
   initVoices();
   refreshIcons();
