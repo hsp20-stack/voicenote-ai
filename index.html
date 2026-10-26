@@ -27,7 +27,7 @@
       <div id="welcome" class="text-center py-12 space-y-3">
         <div class="text-6xl animate-bounce">🤖</div>
         <h2 class="text-2xl font-bold">¡Hola! Soy VoiceNote AI</h2>
-        <p class="text-slate-400 text-sm max-w-sm mx-auto">Pregúntame cualquier cosa: recetas, historias, dudas, personajes o cálculos. Te responderé con voz en español.</p>
+        <p class="text-slate-400 text-sm max-w-sm mx-auto">Pregúntame cualquier duda, pídele redacciones, historias, recetas o preguntas complejas. Te responderé al detalle con voz.</p>
       </div>
     </div>
 
@@ -35,7 +35,7 @@
     <div class="pt-2">
       <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-2xl p-2 shadow-xl focus-within:border-sky-500">
         <button id="micBtn" type="button" class="w-10 h-10 rounded-xl bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center text-lg">🎤</button>
-        <input type="text" id="chatInput" placeholder="Pregúntame cualquier cosa o pulsa el micro..." autocomplete="off" class="flex-1 bg-transparent px-2 text-sm text-white focus:outline-none">
+        <input type="text" id="chatInput" placeholder="Hazme cualquier pregunta, incluso compleja..." autocomplete="off" class="flex-1 bg-transparent px-2 text-sm text-white focus:outline-none">
         <button id="sendBtn" type="button" class="w-10 h-10 rounded-xl bg-sky-600 hover:bg-sky-500 text-white flex items-center justify-center font-bold">⬆️</button>
       </div>
       <p class="text-center text-[11px] text-slate-500 mt-2">Desarrollada por Hugo SP Studios</p>
@@ -49,7 +49,7 @@
         <h3 class="font-bold text-sm">Clave de Google Gemini (Opcional)</h3>
         <button id="closeSettings" class="text-slate-400 hover:text-white text-lg">✕</button>
       </div>
-      <p class="text-xs text-slate-400">Si tienes una clave de Gemini puedes ponerla aquí (opcional):</p>
+      <p class="text-xs text-slate-400">Si tienes una clave de Gemini puedes guardarla aquí:</p>
       <input type="text" id="apiKeyInput" placeholder="Pega tu clave aquí..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-sky-500 outline-none">
       <div class="flex justify-between items-center text-[11px]">
         <span id="keyStatus" class="text-emerald-400 font-semibold"></span>
@@ -62,14 +62,21 @@
     const state = {
       apiKey: localStorage.getItem('gemini_key') || '',
       isProcessing: false,
+      isSpeaking: false,
       recog: null
     };
 
     function speak(text) {
       if (!('speechSynthesis' in window) || !text) return;
-      window.speechSynthesis.cancel();
       
-      const clean = text.replace(/[*_#•`\\]/g, '').slice(0, 320);
+      // Cancelar voz y matar micro para que NUNCA escuche al altavoz
+      window.speechSynthesis.cancel();
+      if (state.recog) {
+        try { state.recog.abort(); } catch(e) {}
+      }
+      state.isSpeaking = true;
+
+      const clean = text.replace(/[*_#•`\\]/g, '').slice(0, 350);
       const ut = new SpeechSynthesisUtterance(clean);
       ut.lang = 'es-ES';
       ut.rate = 0.95;
@@ -78,12 +85,21 @@
       const v = voices.find(x => x.lang.startsWith('es'));
       if (v) ut.voice = v;
 
+      // Al terminar de hablar, dejamos 600ms de silencio antes de admitir nuevo audio
+      ut.onend = () => {
+        setTimeout(() => { state.isSpeaking = false; }, 600);
+      };
+      ut.onerror = () => {
+        state.isSpeaking = false;
+      };
+
       window.speechSynthesis.speak(ut);
     }
 
     function getFastAnswer(q) {
       const clean = q.toLowerCase().trim();
 
+      // Cálculos matemáticos
       const mathClean = clean.replace(/cuánto es|cuanto es|calcula|calcular/i, '').trim();
       const mathMatch = mathClean.match(/^([\d.,\s+\-*/()^]+)$/);
       if (mathMatch) {
@@ -97,7 +113,7 @@
       }
 
       if (/^(hola|buenas|buenos dias|buenas tardes|hey|que tal|qué tal)$/i.test(clean)) {
-        return "¡Hola! Estoy listo para responderte a cualquier pregunta. ¿De qué te gustaría hablar o qué necesitas saber?";
+        return "¡Hola! Estoy listo para responderte a cualquier pregunta, sea sencilla o muy elaborada. ¿De qué te gustaría hablar?";
       }
 
       if (/^(qué hora es|que hora es|hora actual)$/i.test(clean)) {
@@ -113,52 +129,56 @@
       return null;
     }
 
-    // 1. Motor de IA Generativa Libre (Responde CUALQUIER pregunta)
+    // Motor IA Generativa Potente (Hasta 30 segundos para preguntas complejas y elaboradas)
     async function queryGenerativeAI(q) {
+      const prompt = `Eres VoiceNote AI desarrollado por Hugo SP Studios. Responde siempre en español de España de forma completa, detallada y útil a la siguiente consulta del usuario: ${q}`;
+      
+      // Intento 1 con openai-fast
       try {
         const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 18000);
-        const prompt = `Eres VoiceNote AI desarrollado por Hugo SP Studios. Responde siempre en español de España de forma útil, natural y directa a esto: ${q}`;
-        const res = await fetch(`https://text.pollinations.ai/${encodeURIComponent(prompt)}`, {
+        const timer = setTimeout(() => ctrl.abort(), 30000);
+        const res = await fetch(`https://text.pollinations.ai/${encodeURIComponent(prompt)}?model=openai-fast`, {
           signal: ctrl.signal
         });
         clearTimeout(timer);
         if (res.ok) {
           const text = await res.text();
-          if (text && text.trim().length > 3 && !text.includes('Rate limit')) {
+          if (text && text.trim().length > 10 && !text.includes('Rate limit')) {
             return text.trim();
           }
         }
-      } catch (e) {
-        console.warn('Pollinations AI timeout/error:', e);
-      }
+      } catch (e) {}
+
+      // Intento 2 con modelo estándar
+      try {
+        const ctrl2 = new AbortController();
+        const timer2 = setTimeout(() => ctrl2.abort(), 20000);
+        const res2 = await fetch(`https://text.pollinations.ai/${encodeURIComponent(prompt)}`, {
+          signal: ctrl2.signal
+        });
+        clearTimeout(timer2);
+        if (res2.ok) {
+          const text2 = await res2.text();
+          if (text2 && text2.trim().length > 10 && !text2.includes('Rate limit')) {
+            return text2.trim();
+          }
+        }
+      } catch (e) {}
+
       return null;
     }
 
-    // 2. Motor Enciclopedia (Wikipedia en tiempo real)
+    // Motor Enciclopedia Avanzado (Búsqueda por texto completo)
     async function searchEncyclopedia(q) {
       try {
-        const clean = q
-          .replace(/^(qué es|que es|quién es|quien es|cuéntame sobre|cuentame sobre|dime sobre|explícame|explicame|qué significa|que significa|definición de|definicion de|historia de|quién fue|quien fue|háblame de|hablame de)\s+/i, '')
-          .replace(/[?¿!¡]/g, '')
-          .trim();
-
-        if (!clean) return null;
-
-        const searchUrl = `https://es.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(clean)}&limit=1&format=json&origin=*`;
-        const sRes = await fetch(searchUrl);
-        if (sRes.ok) {
-          const sData = await sRes.json();
-          const title = sData[1]?.[0];
-          if (title) {
-            const sumUrl = `https://es.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
-            const sumRes = await fetch(sumUrl);
-            if (sumRes.ok) {
-              const sumData = await sumRes.json();
-              if (sumData.extract && sumData.extract.length > 20) {
-                return sumData.extract;
-              }
-            }
+        const searchUrl = `https://es.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&utf8=&format=json&origin=*`;
+        const res = await fetch(searchUrl);
+        if (res.ok) {
+          const data = await res.json();
+          const firstResult = data.query?.search?.[0];
+          if (firstResult && firstResult.snippet) {
+            const cleanSnippet = firstResult.snippet.replace(/<[^>]+>/g, '');
+            return `**${firstResult.title}**:\n${cleanSnippet}...`;
           }
         }
       } catch (e) {}
@@ -168,22 +188,23 @@
     async function askAI(q) {
       const cleanQ = q.trim();
 
+      // 1. Respuesta ultrarrápida (saludos / cálculos)
       const fast = getFastAnswer(cleanQ);
       if (fast) return fast;
 
+      // 2. Clave Gemini (si está configurada)
       if (state.apiKey) {
-        const key = state.apiKey.trim();
         try {
-          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${encodeURIComponent(key)}`;
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${encodeURIComponent(state.apiKey.trim())}`;
           const res = await fetch(endpoint, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'X-goog-api-key': key
+              'X-goog-api-key': state.apiKey.trim()
             },
             body: JSON.stringify({
               contents: [{
-                parts: [{ text: `Eres VoiceNote AI de Hugo SP Studios. Responde en español de España de forma útil y clara a: ${cleanQ}` }]
+                parts: [{ text: `Eres VoiceNote AI de Hugo SP Studios. Responde en español de España de forma útil, detallada y completa a: ${cleanQ}` }]
               }]
             })
           });
@@ -196,15 +217,15 @@
         } catch (e) {}
       }
 
-      // IA Generativa Libre (Responde CUALQUIER pregunta creativa)
+      // 3. IA Generativa Libre (Resuelve preguntas complejas y elaboradas)
       const gen = await queryGenerativeAI(cleanQ);
       if (gen) return gen;
 
-      // Enciclopedia en tiempo real
+      // 4. Enciclopedia por búsqueda
       const enc = await searchEncyclopedia(cleanQ);
       if (enc) return enc;
 
-      return `He analizado tu consulta sobre "${cleanQ}". Intenta preguntármelo de nuevo o con más detalle y te ayudaré al instante.`;
+      return `He procesado tu pregunta sobre "${cleanQ}". ¿Podrías indicarme algún detalle más específico para darte una mejor respuesta?`;
     }
 
     function appendMessage(sender, text) {
@@ -226,7 +247,7 @@
     }
 
     async function handleSend() {
-      if (state.isProcessing) return;
+      if (state.isProcessing || state.isSpeaking) return;
 
       const input = document.getElementById('chatInput');
       const q = input.value.trim();
@@ -234,8 +255,9 @@
 
       state.isProcessing = true;
 
+      // Abortar micrófono de inmediato
       if (state.recog) {
-        try { state.recog.stop(); } catch(e) {}
+        try { state.recog.abort(); } catch(e) {}
         const micBtn = document.getElementById('micBtn');
         if (micBtn) micBtn.textContent = '🎤';
       }
@@ -247,7 +269,7 @@
       const thinkDiv = document.createElement('div');
       thinkDiv.id = 'thinking';
       thinkDiv.className = 'text-xs text-sky-400 animate-pulse';
-      thinkDiv.textContent = '🤖 Pensando respuesta...';
+      thinkDiv.textContent = '🤖 Pensando y redactando respuesta...';
       box.appendChild(thinkDiv);
       box.scrollTop = box.scrollHeight;
 
@@ -291,19 +313,33 @@
       if (SpeechRecognition) {
         state.recog = new SpeechRecognition();
         state.recog.lang = 'es-ES';
+        
         state.recog.onresult = (e) => {
-          input.value = e.results[0][0].transcript;
-          handleSend();
+          // Bloqueo total: si la IA está pensando o hablando por altavoz, NUNCA procesar
+          if (state.isProcessing || state.isSpeaking || window.speechSynthesis.speaking) {
+            return;
+          }
+          const text = e.results[0][0].transcript;
+          if (text && text.trim().length > 0) {
+            input.value = text;
+            handleSend();
+          }
         };
+
         micBtn.addEventListener('click', () => {
+          if (state.isSpeaking || window.speechSynthesis.speaking) {
+            window.speechSynthesis.cancel();
+            state.isSpeaking = false;
+          }
           try {
             state.recog.start();
             micBtn.textContent = '🔴';
           } catch (e) {
-            state.recog.stop();
+            state.recog.abort();
             micBtn.textContent = '🎤';
           }
         });
+
         state.recog.onend = () => { micBtn.textContent = '🎤'; };
       }
 
