@@ -27,7 +27,7 @@
       <div id="welcome" class="text-center py-12 space-y-3">
         <div class="text-6xl animate-bounce">🤖</div>
         <h2 class="text-2xl font-bold">¡Hola! Soy VoiceNote AI</h2>
-        <p class="text-slate-400 text-sm max-w-sm mx-auto">Tu asistente de voz inteligente creado por Hugo SP Studios. Pregúntame sobre cualquier personaje, tema o cálculo y te responderé con voz.</p>
+        <p class="text-slate-400 text-sm max-w-sm mx-auto">Pregúntame cualquier cosa: recetas, historias, dudas, personajes o cálculos. Te responderé con voz en español.</p>
       </div>
     </div>
 
@@ -35,7 +35,7 @@
     <div class="pt-2">
       <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-2xl p-2 shadow-xl focus-within:border-sky-500">
         <button id="micBtn" type="button" class="w-10 h-10 rounded-xl bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center text-lg">🎤</button>
-        <input type="text" id="chatInput" placeholder="Pregúntame lo que quieras o pulsa el micro..." autocomplete="off" class="flex-1 bg-transparent px-2 text-sm text-white focus:outline-none">
+        <input type="text" id="chatInput" placeholder="Pregúntame cualquier cosa o pulsa el micro..." autocomplete="off" class="flex-1 bg-transparent px-2 text-sm text-white focus:outline-none">
         <button id="sendBtn" type="button" class="w-10 h-10 rounded-xl bg-sky-600 hover:bg-sky-500 text-white flex items-center justify-center font-bold">⬆️</button>
       </div>
       <p class="text-center text-[11px] text-slate-500 mt-2">Desarrollada por Hugo SP Studios</p>
@@ -46,10 +46,10 @@
   <div id="settingsModal" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 hidden z-50">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-4">
       <div class="flex justify-between items-center">
-        <h3 class="font-bold text-sm">Clave de Google Gemini</h3>
+        <h3 class="font-bold text-sm">Clave de Google Gemini (Opcional)</h3>
         <button id="closeSettings" class="text-slate-400 hover:text-white text-lg">✕</button>
       </div>
-      <p class="text-xs text-slate-400">Pega aquí tu clave de Google AI Studio (tanto si empieza por AQ como por AIza):</p>
+      <p class="text-xs text-slate-400">Si tienes una clave de Gemini puedes ponerla aquí (opcional):</p>
       <input type="text" id="apiKeyInput" placeholder="Pega tu clave aquí..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-sky-500 outline-none">
       <div class="flex justify-between items-center text-[11px]">
         <span id="keyStatus" class="text-emerald-400 font-semibold"></span>
@@ -81,10 +81,9 @@
       window.speechSynthesis.speak(ut);
     }
 
-    function getConversationalAnswer(q) {
+    function getFastAnswer(q) {
       const clean = q.toLowerCase().trim();
 
-      // Cálculos matemáticos
       const mathClean = clean.replace(/cuánto es|cuanto es|calcula|calcular/i, '').trim();
       const mathMatch = mathClean.match(/^([\d.,\s+\-*/()^]+)$/);
       if (mathMatch) {
@@ -97,56 +96,46 @@
         } catch (e) {}
       }
 
-      // Saludos
-      if (/^(hola|buenas|buenos dias|buenas tardes|buenas noches|hey|que tal|qué tal)/i.test(clean)) {
-        const saludos = [
-          "¡Hola! ¿En qué puedo ayudarte hoy? Pregúntame sobre cualquier cosa.",
-          "¡Buenas! Estoy listo. Dime qué te gustaría saber.",
-          "¡Hola! Soy VoiceNote AI. ¿De qué quieres hablar?"
-        ];
-        return saludos[Math.floor(Math.random() * saludos.length)];
+      if (/^(hola|buenas|buenos dias|buenas tardes|hey|que tal|qué tal)$/i.test(clean)) {
+        return "¡Hola! Estoy listo para responderte a cualquier pregunta. ¿De qué te gustaría hablar o qué necesitas saber?";
       }
 
-      // Quién eres
-      if (/quien eres|quién eres|tu nombre|como te llamas|cómo te llamas/i.test(clean)) {
-        return "Soy **VoiceNote AI**, un asistente inteligente por voz desarrollado por Hugo SP Studios.";
-      }
-
-      // Chistes
-      if (/chiste|gracioso|risa/i.test(clean)) {
-        const chistes = [
-          "— Papá, papá, ¿qué se siente tener un hijo tan guapo?\n— No lo sé hijo, pregúntale a tu abuelo.",
-          "— ¿Por qué los pájaros no usan Facebook?\n— Porque ya tienen Twitter.",
-          "— ¿Qué le dice una impresora a otra?\n— ¿Esa hoja es tuya o es una impresión mía?"
-        ];
-        return chistes[Math.floor(Math.random() * chistes.length)];
-      }
-
-      // Hora / Fecha
-      if (/hora|que hora|qué hora/i.test(clean)) {
+      if (/^(qué hora es|que hora es|hora actual)$/i.test(clean)) {
         const now = new Date();
         return `Son las **${now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}**.`;
       }
-      if (/dia|día|fecha|que dia es|qué día es/i.test(clean)) {
+      if (/^(qué día es|que dia es|fecha de hoy)$/i.test(clean)) {
         const now = new Date();
         const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
         return `Hoy es **${now.toLocaleDateString('es-ES', opciones)}**.`;
       }
 
-      // Curiosidades
-      if (/curiosidad|dato curioso|sabias que|sabías que/i.test(clean)) {
-        const datos = [
-          "¿Sabías que la miel nunca caduca? Se han encontrado vasijas de 3000 años que siguen en perfecto estado.",
-          "¿Sabías que los pulpos tienen tres corazones y su sangre es de color azul?",
-          "¿Sabías que el corazón de una ballena azul es tan grande que un humano podría nadar por sus arterias?"
-        ];
-        return datos[Math.floor(Math.random() * datos.length)];
-      }
-
       return null;
     }
 
-    // Consulta enciclopedia en tiempo real
+    // 1. Motor de IA Generativa Libre (Responde CUALQUIER pregunta)
+    async function queryGenerativeAI(q) {
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 18000);
+        const prompt = `Eres VoiceNote AI desarrollado por Hugo SP Studios. Responde siempre en español de España de forma útil, natural y directa a esto: ${q}`;
+        const res = await fetch(`https://text.pollinations.ai/${encodeURIComponent(prompt)}`, {
+          signal: ctrl.signal
+        });
+        clearTimeout(timer);
+        if (res.ok) {
+          const text = await res.text();
+          if (text && text.trim().length > 3 && !text.includes('Rate limit')) {
+            return text.trim();
+          }
+        }
+      } catch (e) {
+        console.warn('Pollinations AI timeout/error:', e);
+      }
+      return null;
+    }
+
+    // 2. Motor Enciclopedia (Wikipedia en tiempo real)
     async function searchEncyclopedia(q) {
       try {
         const clean = q
@@ -172,16 +161,16 @@
             }
           }
         }
-      } catch (e) {
-        console.warn('Encyclopedia search failed:', e);
-      }
+      } catch (e) {}
       return null;
     }
 
     async function askAI(q) {
       const cleanQ = q.trim();
 
-      // 1. Si hay clave Gemini (funciona tanto para claves AQ como AIza)
+      const fast = getFastAnswer(cleanQ);
+      if (fast) return fast;
+
       if (state.apiKey) {
         const key = state.apiKey.trim();
         try {
@@ -194,7 +183,7 @@
             },
             body: JSON.stringify({
               contents: [{
-                parts: [{ text: `Eres VoiceNote AI de Hugo SP Studios. Responde en español de España de forma útil, concisa y directa a: ${cleanQ}` }]
+                parts: [{ text: `Eres VoiceNote AI de Hugo SP Studios. Responde en español de España de forma útil y clara a: ${cleanQ}` }]
               }]
             })
           });
@@ -204,21 +193,18 @@
             const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
             if (reply) return reply;
           }
-        } catch (e) {
-          console.warn('Gemini call error:', e);
-        }
+        } catch (e) {}
       }
 
-      // 2. Respuesta conversacional / cálculo
-      const conv = getConversationalAnswer(cleanQ);
-      if (conv) return conv;
+      // IA Generativa Libre (Responde CUALQUIER pregunta creativa)
+      const gen = await queryGenerativeAI(cleanQ);
+      if (gen) return gen;
 
-      // 3. Enciclopedia libre en tiempo real
+      // Enciclopedia en tiempo real
       const enc = await searchEncyclopedia(cleanQ);
       if (enc) return enc;
 
-      // 4. Respuesta amigable por defecto
-      return `He procesado tu pregunta sobre "${cleanQ}". Puedo darte información de personajes históricos, ciencia, países, tecnología, hacer cálculos o contarte curiosidades.`;
+      return `He analizado tu consulta sobre "${cleanQ}". Intenta preguntármelo de nuevo o con más detalle y te ayudaré al instante.`;
     }
 
     function appendMessage(sender, text) {
@@ -248,7 +234,6 @@
 
       state.isProcessing = true;
 
-      // Apagamos micro mientras responde la IA
       if (state.recog) {
         try { state.recog.stop(); } catch(e) {}
         const micBtn = document.getElementById('micBtn');
@@ -262,7 +247,7 @@
       const thinkDiv = document.createElement('div');
       thinkDiv.id = 'thinking';
       thinkDiv.className = 'text-xs text-sky-400 animate-pulse';
-      thinkDiv.textContent = '🤖 Buscando respuesta...';
+      thinkDiv.textContent = '🤖 Pensando respuesta...';
       box.appendChild(thinkDiv);
       box.scrollTop = box.scrollHeight;
 
@@ -342,7 +327,6 @@
           return;
         }
 
-        // Guardamos directamente la clave sin trabas
         state.apiKey = k;
         localStorage.setItem('gemini_key', k);
         keyStatus.textContent = '✓ ¡Clave guardada con éxito!';
